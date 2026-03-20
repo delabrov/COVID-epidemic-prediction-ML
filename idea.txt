@@ -1,0 +1,152 @@
+PROJECT TITLE:
+Hybrid Epidemiological Modeling using SIR + Machine Learning
+
+OBJECTIVE:
+The goal of this project is to build a hybrid epidemiological model that combines a classical SIR (Susceptible-Infected-Recovered) differential equation model with machine learning techniques to improve real-world predictive performance.
+
+Instead of assuming constant parameters, the model will learn time-varying transmission and recovery rates (beta and gamma) from real-world data such as mobility, vaccination rates, and policy measures.
+
+This project aims to demonstrate:
+- Ability to work with real-world noisy time series data
+- Understanding of dynamical systems and differential equations
+- Integration of machine learning into scientific modeling
+- Model evaluation, interpretation, and simulation
+
+--------------------------------------------------
+
+CORE IDEA:
+
+Standard SIR model:
+dS/dt = -beta * S * I
+dI/dt = beta * S * I - gamma * I
+dR/dt = gamma * I
+
+In this project:
+- beta = beta(t, features)
+- gamma = gamma(t, features)
+
+Machine learning models will be used to estimate beta(t) and gamma(t) dynamically.
+
+--------------------------------------------------
+
+DATA SOURCES:
+
+Potential datasets:
+- COVID-19 case data (Johns Hopkins, Our World in Data)
+- Mobility data (Google Mobility Reports)
+- Vaccination data
+- Government policy data (Oxford COVID-19 Government Response Tracker)
+
+Target variables:
+- Daily new cases
+- Active infections (estimated)
+
+Features:
+- Mobility indices
+- Vaccination rates
+- Time (seasonality)
+- Policy indicators
+
+--------------------------------------------------
+
+PROJECT STEPS:
+
+1. DATA COLLECTION
+- Download and merge datasets from multiple sources
+- Align time indices
+- Handle missing values
+
+2. DATA PREPROCESSING
+- Smooth noisy time series (rolling averages)
+- Normalize features
+- Estimate initial S, I, R values
+- Compute population-normalized variables
+
+3. BASELINE SIR MODEL
+- Implement classical SIR model using ODE solver
+- Fit constant beta and gamma parameters
+- Evaluate performance against real data
+
+4. PARAMETER ESTIMATION (TIME-VARYING)
+- Estimate beta(t) and gamma(t) from data using inverse modeling
+- Use rolling window or optimization techniques
+
+5. MACHINE LEARNING MODEL
+- Train models to predict beta(t) and/or gamma(t) using features
+- Possible models:
+    - Linear regression
+    - Random Forest
+    - Gradient Boosting
+    - Neural Networks
+
+6. HYBRID MODEL INTEGRATION
+- Use predicted beta(t), gamma(t) inside SIR equations
+- Simulate epidemic forward in time
+
+7. EVALUATION
+- Compare:
+    - Classical SIR
+    - Hybrid SIR + ML
+    - Pure ML time series model (baseline)
+
+Metrics:
+- RMSE on cases
+- Error on peak magnitude
+- Error on peak timing
+
+8. ANALYSIS
+- Study how beta varies with:
+    - Mobility
+    - Policies
+    - Vaccination
+
+- Compute and analyze effective reproduction number:
+    R_t = beta(t) / gamma(t)
+
+9. SCENARIO SIMULATION
+- Perform "what-if" simulations:
+    - Reduced mobility
+    - Increased vaccination
+    - Policy changes
+
+10. VISUALIZATION
+- Time series plots (real vs predicted)
+- Beta and gamma evolution
+- R_t over time
+- Scenario comparisons
+
+--------------------------------------------------
+
+OPTIONAL ADVANCED EXTENSIONS:
+
+- Neural ODE implementation
+- Physics-Informed Neural Networks (PINNs)
+- Bayesian inference for uncertainty estimation
+- Multi-region modeling (spatial component)
+
+--------------------------------------------------
+
+EXPECTED OUTPUT:
+
+- Clean modular codebase
+- Reproducible pipeline
+- Visualizations and insights
+- Optional dashboard (Streamlit)
+
+--------------------------------------------------
+
+SUCCESS CRITERIA:
+
+- Hybrid model outperforms classical SIR
+- Model produces interpretable insights
+- Code is clean, modular, and well-documented
+- Results are reproducible
+
+--------------------------------------------------
+
+NOTES:
+
+- Be careful with data leakage
+- Account for reporting delays in case data
+- Validate models on unseen time periods
+- Keep a strong focus on interpretability, not only performance

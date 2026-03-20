@@ -1,0 +1,20 @@
+project:
+  name: "hybrid-sir-ml"
+  timezone: "UTC"
+
+sources:
+  owid:
+    enabled: true
+    url: "https://covid.ourworldindata.org/data/owid-covid-data.csv"
+    output_subdir: "owid"
+    output_filename: "owid-covid-data.csv"
+  google_mobility:
+    enabled: true
+    url: "https://www.gstatic.com/covid19/mobility/Global_Mobility_Report.csv"
+    output_subdir: "google_mobility"
+    output_filename: "Global_Mobility_Report.csv"
+  oxcgrt:
+    enabled: true
+    url: "https://raw.githubusercontent.com/OxCGRT/covid-policy-tracker/master/data/OxCGRT_compact_national_v1.csv"
+    output_subdir: "oxcgrt"
+    output_filename: "OxCGRT_compact_national_v1.csv"

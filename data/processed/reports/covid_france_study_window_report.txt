@@ -1,0 +1,26 @@
+COVID Study Window and Analysis Preparation Report
+======================================================
+
+1. Selected study window
+- Country: France
+- Base flow-bounded range: 2020-01-05 -> 2023-07-01
+- Selected window: 2020-01-05 -> 2023-07-01
+- Selected days: 1274
+- Selection reason: Selected longest contiguous segment meeting coverage threshold
+- Min row coverage threshold: 0.5
+- Min window days target: 180
+
+2. Coverage summary (selected window)
+- Mean row coverage: 0.904
+- Median row coverage: 1.000
+- Min row coverage: 0.556
+- Max row coverage: 1.000
+
+3. Candidate contiguous segments
+start_date   end_date  length_days
+2020-01-05 2023-07-01         1274
+
+4. Output datasets
+- Daily rows (selected window): 1274
+- Weekly rows: 183
+- Added normalized columns: 12

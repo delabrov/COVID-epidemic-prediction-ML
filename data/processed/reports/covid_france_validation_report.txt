@@ -1,0 +1,78 @@
+COVID Time Series Validation Report
+========================================
+
+1. Dataset overview
+- Country: France
+- Min date: 2020-01-05
+- Max date: 2024-08-04
+- Number of rows: 1674
+
+2. Index validation
+- Sorted (monotonic): True
+- Unique: True
+- Inferred frequency: D
+- Expected daily rows: 1674
+- Actual rows: 1674
+- Missing calendar dates: 0
+
+3. Missing calendar dates
+- No missing calendar dates detected.
+
+4. Variable coverage summary
+               variable  present_in_dataset  non_null_count  missing_count  missing_pct first_non_null_date last_non_null_date
+              new_cases                True            1274            400        23.89          2020-01-05         2023-07-01
+            total_cases                True            1674              0         0.00          2020-01-05         2024-08-04
+             new_deaths                True            1274            400        23.89          2020-01-05         2023-07-01
+           total_deaths                True            1674              0         0.00          2020-01-05         2024-08-04
+      people_vaccinated                True            1317            357        21.33          2020-12-27         2024-08-04
+people_fully_vaccinated                True            1316            358        21.39          2020-12-28         2024-08-04
+         total_boosters                True            1298            376        22.46          2021-01-15         2024-08-04
+       new_vaccinations                True             925            749        44.74          2020-12-28         2023-07-10
+       stringency_index                True            1092            582        34.77          2020-01-05         2022-12-31
+      reproduction_rate                True            1038            636        37.99          2020-03-01         2023-01-02
+           icu_patients                True            1109            565        33.75          2020-03-18         2023-03-31
+          hosp_patients                True            1109            565        33.75          2020-03-18         2023-03-31
+       new_cases_7d_avg                True            1280            394        23.54          2020-01-05         2023-07-07
+      new_deaths_7d_avg                True            1280            394        23.54          2020-01-05         2023-07-07
+
+5. Cleaning impact summary
+               variable  raw_missing_count  raw_negative_count  final_missing_count
+              new_cases                400                   0                  400
+            total_cases                  0                   0                    0
+             new_deaths                400                   0                  400
+           total_deaths                  0                   0                    0
+      people_vaccinated                748                   0                  357
+people_fully_vaccinated                749                   0                  358
+         total_boosters                767                   0                  376
+       new_vaccinations                749                   0                  749
+       stringency_index                582                   0                  582
+      reproduction_rate                636                   0                  636
+           icu_patients                565                   0                  565
+          hosp_patients                565                   0                  565
+       new_cases_7d_avg               1674                   0                  394
+      new_deaths_7d_avg               1674                   0                  394
+
+6. Trailing missing diagnostics
+               variable  present_in_dataset  trailing_missing_count  trailing_missing_pct
+              new_cases                True                     400                 23.89
+            total_cases                True                       0                  0.00
+             new_deaths                True                     400                 23.89
+           total_deaths                True                       0                  0.00
+      people_vaccinated                True                       0                  0.00
+people_fully_vaccinated                True                       0                  0.00
+         total_boosters                True                       0                  0.00
+       new_vaccinations                True                     391                 23.36
+       stringency_index                True                     582                 34.77
+      reproduction_rate                True                     580                 34.65
+           icu_patients                True                     492                 29.39
+          hosp_patients                True                     492                 29.39
+       new_cases_7d_avg                True                     394                 23.54
+      new_deaths_7d_avg                True                     394                 23.54
+
+7. Tail plateau diagnostics
+               variable  present_in_dataset  trailing_window  tail_non_null_count  tail_distinct_values  is_tail_constant  end_plateau_length  suspicious_plateau last_non_null_date
+            total_cases                True               30                   30                     1              True                  30                True         2024-08-04
+           total_deaths                True               30                   30                     1              True                  30                True         2024-08-04
+      people_vaccinated                True               30                   30                     1              True                  30                True         2024-08-04
+people_fully_vaccinated                True               30                   30                     1              True                  30                True         2024-08-04
+         total_boosters                True               30                   30                     1              True                  30                True         2024-08-04

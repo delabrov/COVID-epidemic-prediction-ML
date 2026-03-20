@@ -1,0 +1,54 @@
+SIR Preparation Report
+==============================
+
+1) Framework definition
+{
+  "country": "France",
+  "time_window": {
+    "start_date": "2020-01-05",
+    "end_date": "2023-07-01",
+    "time_step": "1 day"
+  },
+  "sir_equations": {
+    "dS_dt": "-beta * S * I / N",
+    "dI_dt": "beta * S * I / N - gamma * I",
+    "dR_dt": "gamma * I"
+  },
+  "observation_mapping": {
+    "incidence_signal": "new_cases_7d_avg",
+    "note": "Incidence signal used as observed epidemic dynamics for calibration"
+  },
+  "assumptions": [
+    "Population N is approximately constant on the selected window",
+    "Signal uses 7-day smoothed new cases to reduce reporting noise",
+    "Daily time step is used for SIR discretization",
+    "I_t is approximated from recent incidence over infectious period",
+    "R_t is approximated as cumulative infections minus active infections"
+  ],
+  "initialization_hyperparameters": {
+    "infectious_period_days": 14
+  }
+}
+
+2) SIR-ready dataset preparation
+- start_date: 2020-01-05
+- end_date: 2023-07-01
+- rows: 1274
+- columns: 31
+- signal_column: new_cases_7d_avg
+- signal_missing_after_fill: 0
+- population_column: population
+
+3) Initial state estimation
+- incidence signal used: new_cases_7d_avg
+{
+  "infectious_period_days": 14,
+  "initial_conditions": {
+    "date": "2020-01-05",
+    "N": 67813000.0,
+    "S0": 67813000.0,
+    "I0": 0.0,
+    "R0": 0.0,
+    "S0_plus_I0_plus_R0": 67813000.0
+  }
+}

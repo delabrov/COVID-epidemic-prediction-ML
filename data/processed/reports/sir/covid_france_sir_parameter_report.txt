@@ -1,0 +1,36 @@
+SIR Parameter Estimation Report
+==================================
+
+1. Dataset overview
+- country: France
+- start_date: 2020-01-05
+- end_date: 2023-07-01
+- rows: 1274
+
+2. Estimation configuration
+- infectious_period_days: 14
+- gamma: 0.07142857
+- derivative_method: gradient
+- derivative_pre_smoothing_window: 1
+- beta_smoothing_window: 7
+- epsilon: 1e-08
+- min_infected_threshold: 10.0
+- min_denominator_SI_over_N: 1.0
+- population_column_used: population
+
+3. Validity diagnostics
+- valid beta points: 1141
+- invalid/NaN beta points: 133
+
+4. Summary statistics
+- beta_raw: count=1141, mean=0.107047, std=0.075933, min=-0.108043, p05=0.010788, p25=0.057868, p50=0.098208, p75=0.140651, p95=0.230646, max=1.071430
+- beta_smoothed: count=1141, mean=0.109004, std=0.080560, min=-0.053431, p05=0.013374, p25=0.058304, p50=0.097743, p75=0.143381, p95=0.232927, max=1.071430
+- R_eff_raw: count=1141, mean=1.072437, std=0.842657, min=-0.660299, p05=0.098370, p25=0.571332, p50=1.017461, p75=1.466815, p95=1.956674, max=15.000000
+- R_eff_smoothed: count=1141, mean=1.098157, std=0.946358, min=-0.326415, p05=0.122168, p25=0.597059, p50=1.032097, p75=1.440738, p95=1.967846, max=15.000000
+- R0_proxy_raw: count=1141, mean=1.498655, std=1.063059, min=-1.512606, p05=0.151029, p25=0.810147, p50=1.374917, p75=1.969116, p95=3.229043, max=15.000025
+- R0_proxy_smoothed: count=1141, mean=1.526053, std=1.127836, min=-0.748039, p05=0.187241, p25=0.816260, p50=1.368398, p75=2.007339, p95=3.260984, max=15.000025
+
+5. Methodological caveats
+- S, I, R are reconstructed proxies, not directly observed compartments.
+- beta(t) is inferred from estimated states and numerical derivatives.
+- Estimates near low I(t) values are unstable and masked by safeguards.

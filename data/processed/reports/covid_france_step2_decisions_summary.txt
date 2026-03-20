@@ -1,0 +1,98 @@
+COVID Project - Step 2 Decisions Summary (France)
+=================================================
+
+Date: 2026-03-20
+Scope: Data analysis and preparation stage (no SIR fitting yet)
+Country: France
+
+1) Work Completed in Step 2
+---------------------------
+- Raw OWID data downloaded and validated.
+- Country-level preprocessing completed.
+- Temporal validation and missingness diagnostics completed.
+- Study-window selection module implemented and executed.
+- Analysis-ready datasets produced (daily + weekly).
+- Diagnostic figures generated for decision support.
+
+2) Key Findings Supporting Decisions
+------------------------------------
+A. Full processed timeline quality
+- Full timeline is daily, unique, and sorted.
+- Source: data/processed/reports/covid_france_validation_report.txt
+  Section: "2. Index validation"
+
+B. End-of-series reporting degradation
+- Long trailing missing stretches on critical flow variables:
+  - new_cases: 400 trailing missing days
+  - new_deaths: 400 trailing missing days
+- Source: data/processed/reports/covid_france_validation_report.txt
+  Section: "6. Trailing missing diagnostics"
+
+C. Cumulative plateaus at the tail
+- Last 30 days are constant on cumulative variables (total_cases, total_deaths, etc.),
+  flagged as suspicious plateau.
+- Source: data/processed/reports/covid_france_validation_report.txt
+  Section: "7. Tail plateau diagnostics"
+- Visual support: outputs/figures/cumulative_metrics.png
+
+D. Reliable contiguous interval for dynamic signals
+- Automatic study-window selection found:
+  2020-01-05 -> 2023-07-01 (1274 days)
+- Mean row coverage in selected window: 0.904
+- Source: data/processed/reports/covid_france_study_window_report.txt
+  Sections: "1. Selected study window", "2. Coverage summary"
+- Visual support:
+  - outputs/figures/analysis/covid_france_study_window_selection.png
+  - outputs/figures/analysis/covid_france_missingness_heatmap.png
+
+E. Temporal granularity stabilization
+- Weekly aggregation built from the selected daily window to reduce reporting noise.
+- Source artifact: data/processed/analysis/covid_france_analysis_weekly.parquet
+- Visual support: outputs/figures/analysis/covid_france_daily_vs_weekly_cases.png
+
+F. Normalization readiness
+- Per-100k and percent-population normalized variables generated.
+- Visual support: outputs/figures/analysis/covid_france_normalized_trends.png
+
+3) Decisions Locked for Next Stage
+----------------------------------
+Decision 1 - Study interval
+- Use only: 2020-01-05 -> 2023-07-01
+Rationale:
+- End of full series contains reporting gaps and suspicious plateaus, not suitable for dynamic modeling.
+
+Decision 2 - Main incidence signal for modeling
+- Use new_cases_7d_avg as primary case signal for SIR and future ML.
+Rationale:
+- 7-day smoothing stabilizes daily reporting artifacts and aligns with epidemiological interpretation.
+
+Decision 3 - Keep population normalizations
+- Keep and use normalized variables (per 100k and percent of population).
+Rationale:
+- Improves interpretability and comparability over time and for future multi-region extension.
+
+4) Operational Outputs to Use from Now On
+-----------------------------------------
+Primary analysis dataset (daily, selected window):
+- data/processed/analysis/covid_france_analysis_daily.parquet
+
+Secondary analysis dataset (weekly):
+- data/processed/analysis/covid_france_analysis_weekly.parquet
+
+Decision-support reports:
+- data/processed/reports/covid_france_validation_report.txt
+- data/processed/reports/covid_france_study_window_report.txt
+- data/processed/reports/covid_france_step2_decisions_summary.txt
+
+Decision-support figures:
+- outputs/figures/analysis/covid_france_study_window_selection.png
+- outputs/figures/analysis/covid_france_missingness_heatmap.png
+- outputs/figures/analysis/covid_france_daily_vs_weekly_cases.png
+- outputs/figures/analysis/covid_france_normalized_trends.png
+- outputs/figures/cumulative_metrics.png
+
+5) Implications for Upcoming Work (Step 3+)
+--------------------------------------------
+- Baseline SIR calibration should start on the selected interval only.
+- new_cases_7d_avg should be the reference observed incidence target.
+- Normalized indicators should remain in all future diagnostics and model comparison outputs.

@@ -1,0 +1,11 @@
+{
+  "infectious_period_days": 14,
+  "initial_conditions": {
+    "date": "2020-01-05",
+    "N": 67813000.0,
+    "S0": 67813000.0,
+    "I0": 0.0,
+    "R0": 0.0,
+    "S0_plus_I0_plus_R0": 67813000.0
+  }
+}

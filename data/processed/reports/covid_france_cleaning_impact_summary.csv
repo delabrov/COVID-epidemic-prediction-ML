@@ -1,0 +1,15 @@
+variable,raw_missing_count,raw_negative_count,final_missing_count
+new_cases,400,0,400
+total_cases,0,0,0
+new_deaths,400,0,400
+total_deaths,0,0,0
+people_vaccinated,748,0,357
+people_fully_vaccinated,749,0,358
+total_boosters,767,0,376
+new_vaccinations,749,0,749
+stringency_index,582,0,582
+reproduction_rate,636,0,636
+icu_patients,565,0,565
+hosp_patients,565,0,565
+new_cases_7d_avg,1674,0,394
+new_deaths_7d_avg,1674,0,394

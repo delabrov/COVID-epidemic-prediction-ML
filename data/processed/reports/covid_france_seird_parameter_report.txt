@@ -1,0 +1,41 @@
+SEIRD Parameter Estimation Report
+====================================
+
+1. Dataset overview
+- country: France
+- start_date: 2020-01-05
+- end_date: 2023-07-01
+- rows: 1274
+
+2. Estimation configuration
+- latent_period_days: 5
+- infectious_period_days: 14
+- sigma: 0.20000000
+- gamma: 0.07142857
+- derivative_method: gradient
+- derivative_pre_smoothing_window: 1
+- smoothing_window: 7
+- epsilon: 1e-08
+- min_infected_threshold: 10.0
+- min_exposed_threshold: 10.0
+- min_denominator_SI_over_N: 1.0
+- population_column: population
+
+3. Validity diagnostics
+- valid beta points: 1140
+- invalid beta points: 134
+- valid mu points: 1141
+- invalid mu points: 133
+
+4. Summary statistics
+- beta_raw: count=1140, mean=0.109668, std=0.053946, min=0.015497, p05=0.047284, p25=0.072677, p50=0.096317, p75=0.138200, p95=0.208659, max=0.600157
+- beta_smoothed: count=1140, mean=0.110736, std=0.055051, min=0.031954, p05=0.051986, p25=0.073504, p50=0.097476, p75=0.137221, p95=0.204602, max=0.600157
+- mu_raw: count=1141, mean=0.005008, std=0.124734, min=0.000000, p05=0.000000, p25=0.000000, p50=0.000000, p75=0.000328, p95=0.003996, max=4.187592
+- mu_smoothed: count=1141, mean=0.010854, std=0.152476, min=0.000048, p05=0.000067, p25=0.000150, p50=0.000355, p75=0.000723, p95=0.003326, max=4.187592
+- R_eff_proxy_raw: count=1140, mean=1.057233, std=0.545374, min=0.127695, p05=0.481996, p25=0.769922, p50=0.981268, p75=1.256955, p95=1.718317, max=8.400000
+- R_eff_proxy_smoothed: count=1140, mean=1.028144, std=0.363630, min=0.277107, p05=0.507417, p25=0.738619, p50=0.995956, p75=1.271963, p95=1.606160, max=2.883130
+
+5. Methodological caveats
+- Reconstructed compartments are proxies, not directly observed states.
+- Deaths are lagging indicators and affect mu(t) stability.
+- Parameter estimates may be unstable when E or I are small.

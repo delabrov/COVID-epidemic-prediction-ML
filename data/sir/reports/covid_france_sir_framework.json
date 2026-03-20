@@ -1,0 +1,27 @@
+{
+  "country": "France",
+  "time_window": {
+    "start_date": "2020-01-05",
+    "end_date": "2023-07-01",
+    "time_step": "1 day"
+  },
+  "sir_equations": {
+    "dS_dt": "-beta * S * I / N",
+    "dI_dt": "beta * S * I / N - gamma * I",
+    "dR_dt": "gamma * I"
+  },
+  "observation_mapping": {
+    "incidence_signal": "new_cases_7d_avg",
+    "note": "Incidence signal used as observed epidemic dynamics for calibration"
+  },
+  "assumptions": [
+    "Population N is approximately constant on the selected window",
+    "Signal uses 7-day smoothed new cases to reduce reporting noise",
+    "Daily time step is used for SIR discretization",
+    "I_t is approximated from recent incidence over infectious period",
+    "R_t is approximated as cumulative infections minus active infections"
+  ],
+  "initialization_hyperparameters": {
+    "infectious_period_days": 14
+  }
+}

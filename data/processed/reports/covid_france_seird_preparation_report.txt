@@ -1,0 +1,53 @@
+SEIRD Preparation Report
+============================
+
+1. Framework definition
+{
+  "country": "France",
+  "time_window": {
+    "start_date": "2020-01-05",
+    "end_date": "2023-07-01",
+    "time_step": "1 day"
+  },
+  "seird_equations": {
+    "dS_dt": "-beta * S * I / N",
+    "dE_dt": "beta * S * I / N - sigma * E",
+    "dI_dt": "sigma * E - gamma * I - mu * I",
+    "dR_dt": "gamma * I",
+    "dD_dt": "mu * I"
+  },
+  "observation_mapping": {
+    "incidence_signal": "new_cases_7d_avg",
+    "mortality_signal": "new_deaths_7d_avg"
+  },
+  "assumptions": [
+    "Population N is approximately constant on selected window",
+    "I_estimated is proxied by rolling incidence over infectious period",
+    "E_estimated is proxied by lagged rolling incidence over latent period",
+    "D_estimated uses total_deaths when available, otherwise cumulative smoothed deaths",
+    "R_estimated is inferred from cumulative infections minus E, I, D",
+    "S_estimated is residual compartment: N - E - I - R - D"
+  ],
+  "reconstruction_hyperparameters": {
+    "latent_period_days": 5,
+    "infectious_period_days": 14
+  }
+}
+
+2. State reconstruction summary
+- population_column: population
+- rows: 1274
+- start_date: 2020-01-05
+- end_date: 2023-07-01
+- cases_signal: new_cases_7d_avg
+- deaths_signal: new_deaths_7d_avg
+- latent_period_days: 5
+- infectious_period_days: 14
+- initial_states: {'date': '2020-01-05', 'N': 67813000.0, 'S0': 67813000.0, 'E0': 0.0, 'I0': 0.0, 'R0': 0.0, 'D0': 0.0}
+
+3. Reconstruction variable definitions
+- I_estimated: rolling sum of incidence signal over infectious_period_days
+- E_estimated: lagged rolling sum of incidence signal over latent_period_days
+- D_estimated: total_deaths if available else cumulative smoothed deaths signal
+- R_estimated: cumulative infections - I_estimated - E_estimated - D_estimated
+- S_estimated: N - E_estimated - I_estimated - R_estimated - D_estimated

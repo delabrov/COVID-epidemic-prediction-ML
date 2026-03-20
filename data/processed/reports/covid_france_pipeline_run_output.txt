@@ -1,0 +1,400 @@
+COVID Pipeline Run Output
+========================================
+Run timestamp: 2026-03-20T10:35:42
+Country: France
+
+Run summary
+- Raw dataset rows: 429435
+- Raw dataset columns: 67
+- Processed rows: 1674
+- Processed columns: 16
+- Processed parquet: data/processed/covid_france.parquet
+- Figures directory: outputs/figures
+- Analysis daily dataset: data/processed/analysis/covid_france_analysis_daily.parquet
+- Analysis weekly dataset: data/processed/analysis/covid_france_analysis_weekly.parquet
+- SIR prepared dataset: data/sir/inputs/covid_france_sir_prepared.parquet
+- SIR parameter dataset: data/processed/covid_france_sir_parameters.parquet
+- SEIRD prepared dataset: data/processed/covid_france_seird_ready.parquet
+- SEIRD parameter dataset: data/processed/covid_france_seird_parameters.parquet
+
+Diagnostics artifacts
+- Validation report: data/processed/reports/covid_france_validation_report.txt
+- Coverage CSV: data/processed/reports/covid_france_coverage_summary.csv
+- Cleaning impact CSV: data/processed/reports/covid_france_cleaning_impact_summary.csv
+- Missing dates CSV: data/processed/reports/covid_france_missing_dates.csv
+- Study-window report: data/processed/reports/covid_france_study_window_report.txt
+- Study-window segments CSV: data/processed/reports/covid_france_study_window_segments.csv
+- Study-window coverage CSV: data/processed/reports/covid_france_study_window_daily_coverage.csv
+- Study-window plot: outputs/figures/analysis/covid_france_study_window_selection.png
+- Missingness heatmap: outputs/figures/analysis/covid_france_missingness_heatmap.png
+- Daily vs weekly plot: outputs/figures/analysis/covid_france_daily_vs_weekly_cases.png
+- Normalized trends plot: outputs/figures/analysis/covid_france_normalized_trends.png
+- SIR framework report: data/sir/reports/covid_france_sir_framework.json
+- SIR initial conditions report: data/sir/reports/covid_france_sir_initial_conditions.json
+- SIR preparation report: data/sir/reports/covid_france_sir_preparation_report.txt
+- SIR parameter report: data/processed/reports/sir/covid_france_sir_parameter_report.txt
+- SIR beta plot: outputs/figures/covid_france_beta_estimates.png
+- SIR R_eff plot: outputs/figures/covid_france_reff_estimates.png
+- SIR dI/dt consistency plot: outputs/figures/covid_france_dI_dt_consistency.png
+- SIR summary plot: outputs/figures/covid_france_sir_parameter_summary.png
+- SEIRD preparation report: data/processed/reports/covid_france_seird_preparation_report.txt
+- SEIRD parameter report: data/processed/reports/covid_france_seird_parameter_report.txt
+- SEIRD states plot: outputs/figures/covid_france_seird_states.png
+- SEIRD beta plot: outputs/figures/covid_france_seird_beta_estimates.png
+- SEIRD mu plot: outputs/figures/covid_france_seird_mu_estimates.png
+- SEIRD consistency plot: outputs/figures/covid_france_seird_consistency.png
+- SEIRD R_eff proxy plot: outputs/figures/covid_france_seird_reff_proxy.png
+- SEIRD summary plot: outputs/figures/covid_france_seird_parameter_summary.png
+
+Temporal Validation Report
+----------------------------------------
+COVID Time Series Validation Report
+========================================
+
+1. Dataset overview
+- Country: France
+- Min date: 2020-01-05
+- Max date: 2024-08-04
+- Number of rows: 1674
+
+2. Index validation
+- Sorted (monotonic): True
+- Unique: True
+- Inferred frequency: D
+- Expected daily rows: 1674
+- Actual rows: 1674
+- Missing calendar dates: 0
+
+3. Missing calendar dates
+- No missing calendar dates detected.
+
+4. Variable coverage summary
+               variable  present_in_dataset  non_null_count  missing_count  missing_pct first_non_null_date last_non_null_date
+              new_cases                True            1274            400        23.89          2020-01-05         2023-07-01
+            total_cases                True            1674              0         0.00          2020-01-05         2024-08-04
+             new_deaths                True            1274            400        23.89          2020-01-05         2023-07-01
+           total_deaths                True            1674              0         0.00          2020-01-05         2024-08-04
+      people_vaccinated                True            1317            357        21.33          2020-12-27         2024-08-04
+people_fully_vaccinated                True            1316            358        21.39          2020-12-28         2024-08-04
+         total_boosters                True            1298            376        22.46          2021-01-15         2024-08-04
+       new_vaccinations                True             925            749        44.74          2020-12-28         2023-07-10
+       stringency_index                True            1092            582        34.77          2020-01-05         2022-12-31
+      reproduction_rate                True            1038            636        37.99          2020-03-01         2023-01-02
+           icu_patients                True            1109            565        33.75          2020-03-18         2023-03-31
+          hosp_patients                True            1109            565        33.75          2020-03-18         2023-03-31
+       new_cases_7d_avg                True            1280            394        23.54          2020-01-05         2023-07-07
+      new_deaths_7d_avg                True            1280            394        23.54          2020-01-05         2023-07-07
+
+5. Cleaning impact summary
+               variable  raw_missing_count  raw_negative_count  final_missing_count
+              new_cases                400                   0                  400
+            total_cases                  0                   0                    0
+             new_deaths                400                   0                  400
+           total_deaths                  0                   0                    0
+      people_vaccinated                748                   0                  357
+people_fully_vaccinated                749                   0                  358
+         total_boosters                767                   0                  376
+       new_vaccinations                749                   0                  749
+       stringency_index                582                   0                  582
+      reproduction_rate                636                   0                  636
+           icu_patients                565                   0                  565
+          hosp_patients                565                   0                  565
+       new_cases_7d_avg               1674                   0                  394
+      new_deaths_7d_avg               1674                   0                  394
+
+6. Trailing missing diagnostics
+               variable  present_in_dataset  trailing_missing_count  trailing_missing_pct
+              new_cases                True                     400                 23.89
+            total_cases                True                       0                  0.00
+             new_deaths                True                     400                 23.89
+           total_deaths                True                       0                  0.00
+      people_vaccinated                True                       0                  0.00
+people_fully_vaccinated                True                       0                  0.00
+         total_boosters                True                       0                  0.00
+       new_vaccinations                True                     391                 23.36
+       stringency_index                True                     582                 34.77
+      reproduction_rate                True                     580                 34.65
+           icu_patients                True                     492                 29.39
+          hosp_patients                True                     492                 29.39
+       new_cases_7d_avg                True                     394                 23.54
+      new_deaths_7d_avg                True                     394                 23.54
+
+7. Tail plateau diagnostics
+               variable  present_in_dataset  trailing_window  tail_non_null_count  tail_distinct_values  is_tail_constant  end_plateau_length  suspicious_plateau last_non_null_date
+            total_cases                True               30                   30                     1              True                  30                True         2024-08-04
+           total_deaths                True               30                   30                     1              True                  30                True         2024-08-04
+      people_vaccinated                True               30                   30                     1              True                  30                True         2024-08-04
+people_fully_vaccinated                True               30                   30                     1              True                  30                True         2024-08-04
+         total_boosters                True               30                   30                     1              True                  30                True         2024-08-04
+
+
+Data Quality Report
+----------------------------------------
+=== Data Quality Report ===
+Date range: 2020-01-05 -> 2024-08-04
+Number of rows: 1674
+
+Missing values per column:
+- new_vaccinations: 749
+- reproduction_rate: 636
+- stringency_index: 582
+- icu_patients: 565
+- hosp_patients: 565
+- new_cases: 400
+- new_deaths: 400
+- new_cases_7d_avg: 394
+- new_deaths_7d_avg: 394
+- total_boosters: 376
+- people_fully_vaccinated: 358
+- people_vaccinated: 357
+- location: 0
+- population: 0
+- total_cases: 0
+- total_deaths: 0
+
+Basic statistics (numeric columns):
+                          count          mean           std         min           25%           50%           75%           max
+population               1674.0  6.781300e+07  0.000000e+00  67813000.0  6.781300e+07  6.781300e+07  6.781300e+07  6.781300e+07
+new_cases                1274.0  3.061027e+04  1.604211e+05         0.0  0.000000e+00  0.000000e+00  0.000000e+00  2.417043e+06
+total_cases              1674.0  2.107340e+07  1.676422e+07         0.0  3.287522e+06  2.682692e+07  3.897831e+07  3.899749e+07
+new_deaths               1274.0  1.318564e+02  5.350047e+02         0.0  0.000000e+00  0.000000e+00  0.000000e+00  5.602000e+03
+total_deaths             1674.0  1.179945e+05  5.769697e+04         0.0  8.838200e+04  1.449880e+05  1.678560e+05  1.680910e+05
+people_vaccinated        1317.0  4.774191e+07  1.534406e+07       616.0  5.227778e+07  5.461006e+07  5.467768e+07  5.467768e+07
+people_fully_vaccinated  1316.0  4.466362e+07  1.679477e+07         1.0  4.687730e+07  5.310695e+07  5.319248e+07  5.319248e+07
+total_boosters           1298.0  3.307707e+07  1.949109e+07         1.0  1.004545e+07  4.421158e+07  4.770554e+07  4.770554e+07
+new_vaccinations          925.0  1.670191e+05  2.263222e+05         9.0  9.598000e+03  5.206700e+04  2.236420e+05  9.706400e+05
+stringency_index         1092.0  4.242739e+01  2.402989e+01         0.0  1.881000e+01  4.439000e+01  6.204000e+01  8.796000e+01
+reproduction_rate        1038.0  1.089017e+00  3.485839e-01         0.6  8.400000e-01  1.060000e+00  1.257500e+00  3.090000e+00
+icu_patients             1109.0  2.046519e+03  1.489266e+03       344.0  9.530000e+02  1.445000e+03  2.933000e+03  7.019000e+03
+hosp_patients            1109.0  1.746367e+04  7.955913e+03      2972.0  1.051800e+04  1.740500e+04  2.469300e+04  3.346600e+04
+new_cases_7d_avg         1280.0  3.046679e+04  5.351217e+04         0.0  3.468571e+03  1.270686e+04  3.184071e+04  3.452919e+05
+new_deaths_7d_avg        1280.0  1.312383e+02  1.610442e+02         0.0  2.571429e+01  6.500000e+01  1.652857e+02  8.002857e+02
+
+Study Window Report
+----------------------------------------
+COVID Study Window and Analysis Preparation Report
+======================================================
+
+1. Selected study window
+- Country: France
+- Base flow-bounded range: 2020-01-05 -> 2023-07-01
+- Selected window: 2020-01-05 -> 2023-07-01
+- Selected days: 1274
+- Selection reason: Selected longest contiguous segment meeting coverage threshold
+- Min row coverage threshold: 0.5
+- Min window days target: 180
+
+2. Coverage summary (selected window)
+- Mean row coverage: 0.904
+- Median row coverage: 1.000
+- Min row coverage: 0.556
+- Max row coverage: 1.000
+
+3. Candidate contiguous segments
+start_date   end_date  length_days
+2020-01-05 2023-07-01         1274
+
+4. Output datasets
+- Daily rows (selected window): 1274
+- Weekly rows: 183
+- Added normalized columns: 12
+
+
+SIR Preparation Report
+----------------------------------------
+SIR Preparation Report
+==============================
+
+1) Framework definition
+{
+  "country": "France",
+  "time_window": {
+    "start_date": "2020-01-05",
+    "end_date": "2023-07-01",
+    "time_step": "1 day"
+  },
+  "sir_equations": {
+    "dS_dt": "-beta * S * I / N",
+    "dI_dt": "beta * S * I / N - gamma * I",
+    "dR_dt": "gamma * I"
+  },
+  "observation_mapping": {
+    "incidence_signal": "new_cases_7d_avg",
+    "note": "Incidence signal used as observed epidemic dynamics for calibration"
+  },
+  "assumptions": [
+    "Population N is approximately constant on the selected window",
+    "Signal uses 7-day smoothed new cases to reduce reporting noise",
+    "Daily time step is used for SIR discretization",
+    "I_t is approximated from recent incidence over infectious period",
+    "R_t is approximated as cumulative infections minus active infections"
+  ],
+  "initialization_hyperparameters": {
+    "infectious_period_days": 14
+  }
+}
+
+2) SIR-ready dataset preparation
+- start_date: 2020-01-05
+- end_date: 2023-07-01
+- rows: 1274
+- columns: 31
+- signal_column: new_cases_7d_avg
+- signal_missing_after_fill: 0
+- population_column: population
+
+3) Initial state estimation
+- incidence signal used: new_cases_7d_avg
+{
+  "infectious_period_days": 14,
+  "initial_conditions": {
+    "date": "2020-01-05",
+    "N": 67813000.0,
+    "S0": 67813000.0,
+    "I0": 0.0,
+    "R0": 0.0,
+    "S0_plus_I0_plus_R0": 67813000.0
+  }
+}
+
+
+SIR Parameter Estimation Report
+----------------------------------------
+SIR Parameter Estimation Report
+==================================
+
+1. Dataset overview
+- country: France
+- start_date: 2020-01-05
+- end_date: 2023-07-01
+- rows: 1274
+
+2. Estimation configuration
+- infectious_period_days: 14
+- gamma: 0.07142857
+- derivative_method: gradient
+- derivative_pre_smoothing_window: 1
+- beta_smoothing_window: 7
+- epsilon: 1e-08
+- min_infected_threshold: 10.0
+- min_denominator_SI_over_N: 1.0
+- population_column_used: population
+
+3. Validity diagnostics
+- valid beta points: 1141
+- invalid/NaN beta points: 133
+
+4. Summary statistics
+- beta_raw: count=1141, mean=0.107047, std=0.075933, min=-0.108043, p05=0.010788, p25=0.057868, p50=0.098208, p75=0.140651, p95=0.230646, max=1.071430
+- beta_smoothed: count=1141, mean=0.109004, std=0.080560, min=-0.053431, p05=0.013374, p25=0.058304, p50=0.097743, p75=0.143381, p95=0.232927, max=1.071430
+- R_eff_raw: count=1141, mean=1.072437, std=0.842657, min=-0.660299, p05=0.098370, p25=0.571332, p50=1.017461, p75=1.466815, p95=1.956674, max=15.000000
+- R_eff_smoothed: count=1141, mean=1.098157, std=0.946358, min=-0.326415, p05=0.122168, p25=0.597059, p50=1.032097, p75=1.440738, p95=1.967846, max=15.000000
+- R0_proxy_raw: count=1141, mean=1.498655, std=1.063059, min=-1.512606, p05=0.151029, p25=0.810147, p50=1.374917, p75=1.969116, p95=3.229043, max=15.000025
+- R0_proxy_smoothed: count=1141, mean=1.526053, std=1.127836, min=-0.748039, p05=0.187241, p25=0.816260, p50=1.368398, p75=2.007339, p95=3.260984, max=15.000025
+
+5. Methodological caveats
+- S, I, R are reconstructed proxies, not directly observed compartments.
+- beta(t) is inferred from estimated states and numerical derivatives.
+- Estimates near low I(t) values are unstable and masked by safeguards.
+
+SEIRD Preparation Report
+----------------------------------------
+SEIRD Preparation Report
+============================
+
+1. Framework definition
+{
+  "country": "France",
+  "time_window": {
+    "start_date": "2020-01-05",
+    "end_date": "2023-07-01",
+    "time_step": "1 day"
+  },
+  "seird_equations": {
+    "dS_dt": "-beta * S * I / N",
+    "dE_dt": "beta * S * I / N - sigma * E",
+    "dI_dt": "sigma * E - gamma * I - mu * I",
+    "dR_dt": "gamma * I",
+    "dD_dt": "mu * I"
+  },
+  "observation_mapping": {
+    "incidence_signal": "new_cases_7d_avg",
+    "mortality_signal": "new_deaths_7d_avg"
+  },
+  "assumptions": [
+    "Population N is approximately constant on selected window",
+    "I_estimated is proxied by rolling incidence over infectious period",
+    "E_estimated is proxied by lagged rolling incidence over latent period",
+    "D_estimated uses total_deaths when available, otherwise cumulative smoothed deaths",
+    "R_estimated is inferred from cumulative infections minus E, I, D",
+    "S_estimated is residual compartment: N - E - I - R - D"
+  ],
+  "reconstruction_hyperparameters": {
+    "latent_period_days": 5,
+    "infectious_period_days": 14
+  }
+}
+
+2. State reconstruction summary
+- population_column: population
+- rows: 1274
+- start_date: 2020-01-05
+- end_date: 2023-07-01
+- cases_signal: new_cases_7d_avg
+- deaths_signal: new_deaths_7d_avg
+- latent_period_days: 5
+- infectious_period_days: 14
+- initial_states: {'date': '2020-01-05', 'N': 67813000.0, 'S0': 67813000.0, 'E0': 0.0, 'I0': 0.0, 'R0': 0.0, 'D0': 0.0}
+
+3. Reconstruction variable definitions
+- I_estimated: rolling sum of incidence signal over infectious_period_days
+- E_estimated: lagged rolling sum of incidence signal over latent_period_days
+- D_estimated: total_deaths if available else cumulative smoothed deaths signal
+- R_estimated: cumulative infections - I_estimated - E_estimated - D_estimated
+- S_estimated: N - E_estimated - I_estimated - R_estimated - D_estimated
+
+
+SEIRD Parameter Estimation Report
+----------------------------------------
+SEIRD Parameter Estimation Report
+====================================
+
+1. Dataset overview
+- country: France
+- start_date: 2020-01-05
+- end_date: 2023-07-01
+- rows: 1274
+
+2. Estimation configuration
+- latent_period_days: 5
+- infectious_period_days: 14
+- sigma: 0.20000000
+- gamma: 0.07142857
+- derivative_method: gradient
+- derivative_pre_smoothing_window: 1
+- smoothing_window: 7
+- epsilon: 1e-08
+- min_infected_threshold: 10.0
+- min_exposed_threshold: 10.0
+- min_denominator_SI_over_N: 1.0
+- population_column: population
+
+3. Validity diagnostics
+- valid beta points: 1140
+- invalid beta points: 134
+- valid mu points: 1141
+- invalid mu points: 133
+
+4. Summary statistics
+- beta_raw: count=1140, mean=0.109668, std=0.053946, min=0.015497, p05=0.047284, p25=0.072677, p50=0.096317, p75=0.138200, p95=0.208659, max=0.600157
+- beta_smoothed: count=1140, mean=0.110736, std=0.055051, min=0.031954, p05=0.051986, p25=0.073504, p50=0.097476, p75=0.137221, p95=0.204602, max=0.600157
+- mu_raw: count=1141, mean=0.005008, std=0.124734, min=0.000000, p05=0.000000, p25=0.000000, p50=0.000000, p75=0.000328, p95=0.003996, max=4.187592
+- mu_smoothed: count=1141, mean=0.010854, std=0.152476, min=0.000048, p05=0.000067, p25=0.000150, p50=0.000355, p75=0.000723, p95=0.003326, max=4.187592
+- R_eff_proxy_raw: count=1140, mean=1.057233, std=0.545374, min=0.127695, p05=0.481996, p25=0.769922, p50=0.981268, p75=1.256955, p95=1.718317, max=8.400000
+- R_eff_proxy_smoothed: count=1140, mean=1.028144, std=0.363630, min=0.277107, p05=0.507417, p25=0.738619, p50=0.995956, p75=1.271963, p95=1.606160, max=2.883130
+
+5. Methodological caveats
+- Reconstructed compartments are proxies, not directly observed states.
+- Deaths are lagging indicators and affect mu(t) stability.
+- Parameter estimates may be unstable when E or I are small.
+
