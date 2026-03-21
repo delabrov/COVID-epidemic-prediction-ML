@@ -475,7 +475,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--reports-dir",
         type=Path,
-        default=Path("data/sir/reports"),
+        default=Path("data/processed/reports/sir"),
         help="Directory for SIR reports",
     )
     parser.add_argument(

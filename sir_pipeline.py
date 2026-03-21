@@ -38,7 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--reports-dir",
         type=Path,
-        default=Path("data/sir/reports"),
+        default=Path("data/processed/reports/sir"),
         help="Directory for SIR preparation reports",
     )
     parser.add_argument(
@@ -89,7 +89,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--parameters-figures-dir",
         type=Path,
-        default=Path("outputs/figures"),
+        default=Path("outputs/figures/sir"),
         help="Directory for SIR parameter plots",
     )
     parser.add_argument(

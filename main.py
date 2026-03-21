@@ -268,7 +268,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sir-reports-dir",
         type=Path,
-        default=Path("data/sir/reports"),
+        default=Path("data/processed/reports/sir"),
         help="Directory for SIR preparation reports",
     )
     parser.add_argument(
@@ -327,7 +327,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sir-parameters-figures-dir",
         type=Path,
-        default=Path("outputs/figures"),
+        default=Path("outputs/figures/sir"),
         help="Directory for SIR parameter estimation plots",
     )
     parser.add_argument(
@@ -392,13 +392,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--seird-reports-dir",
         type=Path,
-        default=Path("data/processed/reports"),
+        default=Path("data/processed/reports/seird"),
         help="Directory for SEIRD reports",
     )
     parser.add_argument(
         "--seird-figures-dir",
         type=Path,
-        default=Path("outputs/figures"),
+        default=Path("outputs/figures/seird"),
         help="Directory for SEIRD plots",
     )
     parser.add_argument(

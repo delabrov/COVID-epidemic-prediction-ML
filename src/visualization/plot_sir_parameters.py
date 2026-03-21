@@ -211,7 +211,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("outputs/figures"),
+        default=Path("outputs/figures/sir"),
         help="Directory for output figures",
     )
     return parser.parse_args()

@@ -1,6 +1,6 @@
 COVID Pipeline Run Output
 ========================================
-Run timestamp: 2026-03-20T10:35:42
+Run timestamp: 2026-03-21T12:11:20
 Country: France
 
 Run summary
@@ -29,22 +29,22 @@ Diagnostics artifacts
 - Missingness heatmap: outputs/figures/analysis/covid_france_missingness_heatmap.png
 - Daily vs weekly plot: outputs/figures/analysis/covid_france_daily_vs_weekly_cases.png
 - Normalized trends plot: outputs/figures/analysis/covid_france_normalized_trends.png
-- SIR framework report: data/sir/reports/covid_france_sir_framework.json
-- SIR initial conditions report: data/sir/reports/covid_france_sir_initial_conditions.json
-- SIR preparation report: data/sir/reports/covid_france_sir_preparation_report.txt
+- SIR framework report: data/processed/reports/sir/covid_france_sir_framework.json
+- SIR initial conditions report: data/processed/reports/sir/covid_france_sir_initial_conditions.json
+- SIR preparation report: data/processed/reports/sir/covid_france_sir_preparation_report.txt
 - SIR parameter report: data/processed/reports/sir/covid_france_sir_parameter_report.txt
-- SIR beta plot: outputs/figures/covid_france_beta_estimates.png
-- SIR R_eff plot: outputs/figures/covid_france_reff_estimates.png
-- SIR dI/dt consistency plot: outputs/figures/covid_france_dI_dt_consistency.png
-- SIR summary plot: outputs/figures/covid_france_sir_parameter_summary.png
-- SEIRD preparation report: data/processed/reports/covid_france_seird_preparation_report.txt
-- SEIRD parameter report: data/processed/reports/covid_france_seird_parameter_report.txt
-- SEIRD states plot: outputs/figures/covid_france_seird_states.png
-- SEIRD beta plot: outputs/figures/covid_france_seird_beta_estimates.png
-- SEIRD mu plot: outputs/figures/covid_france_seird_mu_estimates.png
-- SEIRD consistency plot: outputs/figures/covid_france_seird_consistency.png
-- SEIRD R_eff proxy plot: outputs/figures/covid_france_seird_reff_proxy.png
-- SEIRD summary plot: outputs/figures/covid_france_seird_parameter_summary.png
+- SIR beta plot: outputs/figures/sir/covid_france_beta_estimates.png
+- SIR R_eff plot: outputs/figures/sir/covid_france_reff_estimates.png
+- SIR dI/dt consistency plot: outputs/figures/sir/covid_france_dI_dt_consistency.png
+- SIR summary plot: outputs/figures/sir/covid_france_sir_parameter_summary.png
+- SEIRD preparation report: data/processed/reports/seird/covid_france_seird_preparation_report.txt
+- SEIRD parameter report: data/processed/reports/seird/covid_france_seird_parameter_report.txt
+- SEIRD states plot: outputs/figures/seird/covid_france_seird_states.png
+- SEIRD beta plot: outputs/figures/seird/covid_france_seird_beta_estimates.png
+- SEIRD mu plot: outputs/figures/seird/covid_france_seird_mu_estimates.png
+- SEIRD consistency plot: outputs/figures/seird/covid_france_seird_consistency.png
+- SEIRD R_eff proxy plot: outputs/figures/seird/covid_france_seird_reff_proxy.png
+- SEIRD summary plot: outputs/figures/seird/covid_france_seird_parameter_summary.png
 
 Temporal Validation Report
 ----------------------------------------

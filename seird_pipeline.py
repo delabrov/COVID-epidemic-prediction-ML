@@ -37,13 +37,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--reports-dir",
         type=Path,
-        default=Path("data/processed/reports"),
+        default=Path("data/processed/reports/seird"),
         help="Directory for SEIRD reports",
     )
     parser.add_argument(
         "--figures-dir",
         type=Path,
-        default=Path("outputs/figures"),
+        default=Path("outputs/figures/seird"),
         help="Directory for SEIRD plots",
     )
     parser.add_argument("--start-date", type=str, default=DEFAULT_START_DATE)

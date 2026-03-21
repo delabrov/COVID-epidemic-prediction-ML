@@ -409,7 +409,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--reports-dir",
         type=Path,
-        default=Path("data/processed/reports"),
+        default=Path("data/processed/reports/seird"),
         help="Directory for SEIRD parameter report",
     )
     parser.add_argument("--latent-period-days", type=int, default=DEFAULT_LATENT_PERIOD_DAYS)
