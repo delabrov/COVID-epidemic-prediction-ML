@@ -134,6 +134,10 @@ def save_pipeline_terminal_output_report(
         lines.append(f"- SEIRD consistency plot: {seird_plots_result.get('consistency_plot_path')}")
         lines.append(f"- SEIRD R_eff proxy plot: {seird_plots_result.get('reff_proxy_plot_path')}")
         lines.append(f"- SEIRD summary plot: {seird_plots_result.get('summary_plot_path')}")
+        lines.append(
+            "- SEIRD observed vs reconstructed flows plot: "
+            f"{seird_plots_result.get('observed_vs_reconstructed_flows_plot_path')}"
+        )
     lines.append("")
     lines.append("Temporal Validation Report")
     lines.append("-" * 40)
@@ -438,6 +442,14 @@ def parse_args() -> argparse.Namespace:
         help="Latent period assumption for SEIRD sigma = 1/latent_period_days",
     )
     parser.add_argument(
+        "--seird-death-delay-days",
+        "--death-delay-days",
+        dest="seird_death_delay_days",
+        type=int,
+        default=14,
+        help="Delay (days) for SEIRD mu(t): dD/dt divided by I(t - death_delay_days)",
+    )
+    parser.add_argument(
         "--seird-save-csv",
         action="store_true",
         help="Also save SEIRD-ready and SEIRD-parameters datasets as CSV",
@@ -603,6 +615,7 @@ def run_pipeline(args: argparse.Namespace) -> Path:
             reports_dir=args.seird_reports_dir,
             latent_period_days=args.latent_period_days,
             infectious_period_days=args.infectious_period_days,
+            death_delay_days=args.seird_death_delay_days,
             derivative_method=args.seird_derivative_method,
             derivative_smoothing_window=args.seird_derivative_smoothing_window,
             smoothing_window=args.seird_smoothing_window,

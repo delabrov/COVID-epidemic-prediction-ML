@@ -73,27 +73,24 @@ def _resolve_population_column(df: pd.DataFrame) -> str:
 
 
 def plot_seird_states(df: pd.DataFrame, output_path: Path, country: str) -> Path:
-    """Plot reconstructed SEIRD compartments in absolute and normalized scales."""
+    """Plot reconstructed SEIRD compartments normalized by population on log scale."""
     population_column = _resolve_population_column(df)
     pop = df[population_column].astype(float)
 
-    fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    fig, axis = plt.subplots(figsize=(12, 5))
     for column in ["S_estimated", "E_estimated", "I_estimated", "R_estimated", "D_estimated"]:
         if column in df.columns:
-            axes[0].plot(df.index, df[column], linewidth=1.5, label=column)
-    axes[0].set_title(f"Reconstructed SEIRD States - {country}")
-    axes[0].set_ylabel("People")
-    axes[0].grid(alpha=0.2)
-    _safe_legend(axes[0])
+            normalized = (df[column] / pop).astype(float)
+            # Log-scale plotting requires strictly positive values.
+            normalized = normalized.where(normalized > 0)
+            axis.plot(df.index, normalized, linewidth=1.5, label=f"{column}/N")
 
-    for column in ["S_estimated", "E_estimated", "I_estimated", "R_estimated", "D_estimated"]:
-        if column in df.columns:
-            axes[1].plot(df.index, df[column] / pop, linewidth=1.5, label=f"{column}/N")
-    axes[1].set_title("Reconstructed SEIRD States (normalized by population)")
-    axes[1].set_ylabel("Fraction of population")
-    axes[1].set_xlabel("Date")
-    axes[1].grid(alpha=0.2)
-    _safe_legend(axes[1])
+    axis.set_title(f"Reconstructed SEIRD States (normalized, log scale) - {country}")
+    axis.set_ylabel("Fraction of population (log scale)")
+    axis.set_xlabel("Date")
+    axis.set_yscale("log")
+    axis.grid(alpha=0.2)
+    _safe_legend(axis)
     return _save_figure(fig, output_path)
 
 
@@ -147,7 +144,7 @@ def plot_seird_consistency(df: pd.DataFrame, output_path: Path, country: str) ->
     if "dD_dt" in df.columns:
         axes[1].plot(df.index, df["dD_dt"], linewidth=1.4, label="dD_dt")
     if "mu_i_term_smoothed" in df.columns:
-        axes[1].plot(df.index, df["mu_i_term_smoothed"], linewidth=1.4, label="mu*I (smoothed)")
+        axes[1].plot(df.index, df["mu_i_term_smoothed"], linewidth=1.4, label="mu*I_lagged (smoothed)")
     axes[1].set_title("SEIRD Death Equation Consistency")
     axes[1].set_ylabel("People/day")
     axes[1].set_xlabel("Date")
@@ -223,6 +220,66 @@ def plot_seird_summary(df: pd.DataFrame, output_path: Path, country: str) -> Pat
     return _save_figure(fig, output_path)
 
 
+def plot_seird_observed_vs_reconstructed_flows(
+    df: pd.DataFrame,
+    output_path: Path,
+    country: str,
+) -> Path | None:
+    """Compare observed case/death flows against reconstructed SEIRD flows."""
+    required_cases = ["new_cases_7d_avg", "sigma", "E_estimated"]
+    missing_cases = [column for column in required_cases if column not in df.columns]
+    if missing_cases:
+        LOGGER.warning(
+            "Skipping observed-vs-reconstructed SEIRD flow plot: missing case columns %s",
+            missing_cases,
+        )
+        return None
+
+    infected_for_death_column = "I_lagged_for_death" if "I_lagged_for_death" in df.columns else "I_estimated"
+    required_deaths = ["new_deaths_7d_avg", "mu_smoothed", infected_for_death_column]
+    missing_deaths = [column for column in required_deaths if column not in df.columns]
+    if missing_deaths:
+        LOGGER.warning(
+            "Skipping observed-vs-reconstructed SEIRD flow plot: missing death columns %s",
+            missing_deaths,
+        )
+        return None
+
+    observed_cases = df["new_cases_7d_avg"].astype(float)
+    reconstructed_cases = df["sigma"].astype(float) * df["E_estimated"].astype(float)
+    observed_deaths = df["new_deaths_7d_avg"].astype(float)
+    reconstructed_deaths = df["mu_smoothed"].astype(float) * df[infected_for_death_column].astype(float)
+
+    fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+
+    axes[0].plot(df.index, observed_cases, linewidth=1.5, label="observed_cases (new_cases_7d_avg)")
+    axes[0].plot(  # sigma * E is the reconstructed transition into I.
+        df.index,
+        reconstructed_cases,
+        linewidth=1.5,
+        label="reconstructed_cases (sigma*E_estimated)",
+    )
+    axes[0].set_title(f"Observed vs reconstructed case flow - {country}")
+    axes[0].set_ylabel("People/day")
+    axes[0].grid(alpha=0.2)
+    _safe_legend(axes[0])
+
+    axes[1].plot(df.index, observed_deaths, linewidth=1.5, label="observed_deaths (new_deaths_7d_avg)")
+    axes[1].plot(
+        df.index,
+        reconstructed_deaths,
+        linewidth=1.5,
+        label=f"reconstructed_deaths (mu*{infected_for_death_column})",
+    )
+    axes[1].set_title(f"Observed vs reconstructed death flow - {country}")
+    axes[1].set_ylabel("People/day")
+    axes[1].set_xlabel("Date")
+    axes[1].grid(alpha=0.2)
+    _safe_legend(axes[1])
+
+    return _save_figure(fig, output_path)
+
+
 def generate_seird_parameter_plots(df: pd.DataFrame, output_dir: Path, country: str) -> dict[str, Path | None]:
     """Generate full SEIRD analysis plot set."""
     dataset = _ensure_datetime_index(df)
@@ -234,6 +291,9 @@ def generate_seird_parameter_plots(df: pd.DataFrame, output_dir: Path, country: 
     consistency_path = output_dir / f"covid_{slug}_seird_consistency.png"
     reff_path = output_dir / f"covid_{slug}_seird_reff_proxy.png"
     summary_path = output_dir / f"covid_{slug}_seird_parameter_summary.png"
+    observed_vs_reconstructed_flows_path = (
+        output_dir / f"covid_{slug}_seird_observed_vs_reconstructed_flows.png"
+    )
 
     return {
         "states_plot_path": plot_seird_states(dataset, states_path, country),
@@ -242,6 +302,11 @@ def generate_seird_parameter_plots(df: pd.DataFrame, output_dir: Path, country: 
         "consistency_plot_path": plot_seird_consistency(dataset, consistency_path, country),
         "reff_proxy_plot_path": plot_seird_reff_proxy(dataset, reff_path, country),
         "summary_plot_path": plot_seird_summary(dataset, summary_path, country),
+        "observed_vs_reconstructed_flows_plot_path": plot_seird_observed_vs_reconstructed_flows(
+            dataset,
+            observed_vs_reconstructed_flows_path,
+            country,
+        ),
     }
 
 

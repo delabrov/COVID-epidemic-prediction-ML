@@ -53,6 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--population-column", type=str, default=DEFAULT_POPULATION_COLUMN)
     parser.add_argument("--latent-period-days", type=int, default=5)
     parser.add_argument("--infectious-period-days", type=int, default=14)
+    parser.add_argument("--death-delay-days", type=int, default=14)
     parser.add_argument("--save-csv", action="store_true", help="Also save SEIRD-ready dataset as CSV")
 
     parser.add_argument(
@@ -102,6 +103,7 @@ def main() -> None:
         reports_dir=args.reports_dir,
         latent_period_days=args.latent_period_days,
         infectious_period_days=args.infectious_period_days,
+        death_delay_days=args.death_delay_days,
         derivative_method=args.derivative_method,
         derivative_smoothing_window=args.derivative_smoothing_window,
         smoothing_window=args.smoothing_window,

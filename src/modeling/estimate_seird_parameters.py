@@ -17,6 +17,7 @@ DEFAULT_DERIVATIVE_METHOD = "gradient"
 DEFAULT_SMOOTHING_WINDOW = 7
 DEFAULT_LATENT_PERIOD_DAYS = 5
 DEFAULT_INFECTIOUS_PERIOD_DAYS = 14
+DEFAULT_DEATH_DELAY_DAYS = 14
 DEFAULT_EPSILON = 1e-8
 DEFAULT_MIN_INFECTED_THRESHOLD = 10.0
 DEFAULT_MIN_EXPOSED_THRESHOLD = 10.0
@@ -125,16 +126,23 @@ def estimate_derivative(
 def estimate_mu(
     df: pd.DataFrame,
     *,
+    death_delay_days: int,
     epsilon: float,
     min_infected_threshold: float,
 ) -> tuple[pd.Series, pd.Series]:
-    """Estimate mu(t) from dD/dt = mu * I."""
-    infected = df["I_estimated"].astype(float)
+    """Estimate mu(t) from delayed relation dD/dt = mu * I(t - death_delay_days)."""
+    if death_delay_days < 0:
+        raise ValueError("death_delay_days must be >= 0")
+
+    if "I_lagged_for_death" in df.columns:
+        infected_lagged = df["I_lagged_for_death"].astype(float)
+    else:
+        infected_lagged = df["I_estimated"].astype(float).shift(death_delay_days)
     d_d_dt = df["dD_dt"].astype(float)
     denom_threshold = max(float(epsilon), float(min_infected_threshold))
 
-    valid_mask = infected.abs() > denom_threshold
-    mu = (d_d_dt / infected).where(valid_mask)
+    valid_mask = infected_lagged.abs() > denom_threshold
+    mu = (d_d_dt / infected_lagged).where(valid_mask)
     mu.name = "mu_raw"
     return mu, valid_mask
 
@@ -207,6 +215,7 @@ def _build_parameter_report_text(
     dataset: pd.DataFrame,
     latent_period_days: int,
     infectious_period_days: int,
+    death_delay_days: int,
     sigma: float,
     gamma: float,
     derivative_method: str,
@@ -234,6 +243,7 @@ def _build_parameter_report_text(
     lines.append("2. Estimation configuration")
     lines.append(f"- latent_period_days: {latent_period_days}")
     lines.append(f"- infectious_period_days: {infectious_period_days}")
+    lines.append(f"- death_delay_days: {death_delay_days}")
     lines.append(f"- sigma: {sigma:.8f}")
     lines.append(f"- gamma: {gamma:.8f}")
     lines.append(f"- derivative_method: {derivative_method}")
@@ -256,7 +266,8 @@ def _build_parameter_report_text(
     lines.append("")
     lines.append("5. Methodological caveats")
     lines.append("- Reconstructed compartments are proxies, not directly observed states.")
-    lines.append("- Deaths are lagging indicators and affect mu(t) stability.")
+    lines.append("- mu(t) is estimated with delayed infected states: dD/dt divided by I(t - death_delay_days).")
+    lines.append("- Deaths are lagging indicators and still affect mu(t) stability.")
     lines.append("- Parameter estimates may be unstable when E or I are small.")
     lines.append("")
     return "\n".join(lines)
@@ -270,6 +281,7 @@ def run_seird_parameter_estimation_pipeline(
     reports_dir: Path,
     latent_period_days: int = DEFAULT_LATENT_PERIOD_DAYS,
     infectious_period_days: int = DEFAULT_INFECTIOUS_PERIOD_DAYS,
+    death_delay_days: int = DEFAULT_DEATH_DELAY_DAYS,
     derivative_method: str = DEFAULT_DERIVATIVE_METHOD,
     derivative_smoothing_window: int = 1,
     smoothing_window: int = DEFAULT_SMOOTHING_WINDOW,
@@ -287,9 +299,12 @@ def run_seird_parameter_estimation_pipeline(
     country_slug = _slugify_country(country)
     dataset = load_seird_ready_data(input_path)
     validate_required_columns(dataset, population_column=population_column)
+    if death_delay_days < 0:
+        raise ValueError("death_delay_days must be >= 0")
 
     sigma = estimate_sigma(latent_period_days)
     gamma = estimate_gamma(infectious_period_days)
+    LOGGER.info("SEIRD mu(t) delay setting: death_delay_days=%s", death_delay_days)
 
     enriched = dataset.copy()
     enriched["sigma"] = sigma
@@ -304,6 +319,8 @@ def run_seird_parameter_estimation_pipeline(
         method=derivative_method,
         pre_smoothing_window=derivative_smoothing_window,
     )
+    # Phenomenological delay proxy for deaths relative to infected prevalence.
+    enriched["I_lagged_for_death"] = enriched["I_estimated"].astype(float).shift(death_delay_days)
 
     beta_raw, denominator_s_i_over_n, beta_valid_mask = estimate_beta(
         enriched,
@@ -322,6 +339,7 @@ def run_seird_parameter_estimation_pipeline(
 
     mu_raw, mu_valid_mask = estimate_mu(
         enriched,
+        death_delay_days=death_delay_days,
         epsilon=epsilon,
         min_infected_threshold=min_infected_threshold,
     )
@@ -333,7 +351,7 @@ def run_seird_parameter_estimation_pipeline(
     # Consistency terms for plotting diagnostics.
     enriched["beta_s_i_over_n_smoothed"] = enriched["beta_smoothed"] * enriched["denominator_SI_over_N"]
     enriched["sigma_e_term"] = sigma * enriched["E_estimated"]
-    enriched["mu_i_term_smoothed"] = enriched["mu_smoothed"] * enriched["I_estimated"]
+    enriched["mu_i_term_smoothed"] = enriched["mu_smoothed"] * enriched["I_lagged_for_death"]
 
     denom_raw = gamma + enriched["mu_raw"]
     denom_smooth = gamma + enriched["mu_smoothed"]
@@ -359,6 +377,7 @@ def run_seird_parameter_estimation_pipeline(
         dataset=enriched,
         latent_period_days=latent_period_days,
         infectious_period_days=infectious_period_days,
+        death_delay_days=death_delay_days,
         sigma=sigma,
         gamma=gamma,
         derivative_method=derivative_method,
@@ -414,6 +433,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--latent-period-days", type=int, default=DEFAULT_LATENT_PERIOD_DAYS)
     parser.add_argument("--infectious-period-days", type=int, default=DEFAULT_INFECTIOUS_PERIOD_DAYS)
+    parser.add_argument("--death-delay-days", type=int, default=DEFAULT_DEATH_DELAY_DAYS)
     parser.add_argument(
         "--derivative-method",
         type=str,
@@ -442,6 +462,7 @@ def main() -> None:
         reports_dir=args.reports_dir,
         latent_period_days=args.latent_period_days,
         infectious_period_days=args.infectious_period_days,
+        death_delay_days=args.death_delay_days,
         derivative_method=args.derivative_method,
         derivative_smoothing_window=args.derivative_smoothing_window,
         smoothing_window=args.smoothing_window,
