@@ -1,6 +1,6 @@
 COVID Pipeline Run Output
 ========================================
-Run timestamp: 2026-03-21T12:11:20
+Run timestamp: 2026-03-25T16:31:46
 Country: France
 
 Run summary
@@ -12,8 +12,6 @@ Run summary
 - Figures directory: outputs/figures
 - Analysis daily dataset: data/processed/analysis/covid_france_analysis_daily.parquet
 - Analysis weekly dataset: data/processed/analysis/covid_france_analysis_weekly.parquet
-- SIR prepared dataset: data/sir/inputs/covid_france_sir_prepared.parquet
-- SIR parameter dataset: data/processed/covid_france_sir_parameters.parquet
 - SEIRD prepared dataset: data/processed/covid_france_seird_ready.parquet
 - SEIRD parameter dataset: data/processed/covid_france_seird_parameters.parquet
 
@@ -29,14 +27,6 @@ Diagnostics artifacts
 - Missingness heatmap: outputs/figures/analysis/covid_france_missingness_heatmap.png
 - Daily vs weekly plot: outputs/figures/analysis/covid_france_daily_vs_weekly_cases.png
 - Normalized trends plot: outputs/figures/analysis/covid_france_normalized_trends.png
-- SIR framework report: data/processed/reports/sir/covid_france_sir_framework.json
-- SIR initial conditions report: data/processed/reports/sir/covid_france_sir_initial_conditions.json
-- SIR preparation report: data/processed/reports/sir/covid_france_sir_preparation_report.txt
-- SIR parameter report: data/processed/reports/sir/covid_france_sir_parameter_report.txt
-- SIR beta plot: outputs/figures/sir/covid_france_beta_estimates.png
-- SIR R_eff plot: outputs/figures/sir/covid_france_reff_estimates.png
-- SIR dI/dt consistency plot: outputs/figures/sir/covid_france_dI_dt_consistency.png
-- SIR summary plot: outputs/figures/sir/covid_france_sir_parameter_summary.png
 - SEIRD preparation report: data/processed/reports/seird/covid_france_seird_preparation_report.txt
 - SEIRD parameter report: data/processed/reports/seird/covid_france_seird_parameter_report.txt
 - SEIRD states plot: outputs/figures/seird/covid_france_seird_states.png
@@ -200,103 +190,6 @@ start_date   end_date  length_days
 - Added normalized columns: 12
 
 
-SIR Preparation Report
-----------------------------------------
-SIR Preparation Report
-==============================
-
-1) Framework definition
-{
-  "country": "France",
-  "time_window": {
-    "start_date": "2020-01-05",
-    "end_date": "2023-07-01",
-    "time_step": "1 day"
-  },
-  "sir_equations": {
-    "dS_dt": "-beta * S * I / N",
-    "dI_dt": "beta * S * I / N - gamma * I",
-    "dR_dt": "gamma * I"
-  },
-  "observation_mapping": {
-    "incidence_signal": "new_cases_7d_avg",
-    "note": "Incidence signal used as observed epidemic dynamics for calibration"
-  },
-  "assumptions": [
-    "Population N is approximately constant on the selected window",
-    "Signal uses 7-day smoothed new cases to reduce reporting noise",
-    "Daily time step is used for SIR discretization",
-    "I_t is approximated from recent incidence over infectious period",
-    "R_t is approximated as cumulative infections minus active infections"
-  ],
-  "initialization_hyperparameters": {
-    "infectious_period_days": 14
-  }
-}
-
-2) SIR-ready dataset preparation
-- start_date: 2020-01-05
-- end_date: 2023-07-01
-- rows: 1274
-- columns: 31
-- signal_column: new_cases_7d_avg
-- signal_missing_after_fill: 0
-- population_column: population
-
-3) Initial state estimation
-- incidence signal used: new_cases_7d_avg
-{
-  "infectious_period_days": 14,
-  "initial_conditions": {
-    "date": "2020-01-05",
-    "N": 67813000.0,
-    "S0": 67813000.0,
-    "I0": 0.0,
-    "R0": 0.0,
-    "S0_plus_I0_plus_R0": 67813000.0
-  }
-}
-
-
-SIR Parameter Estimation Report
-----------------------------------------
-SIR Parameter Estimation Report
-==================================
-
-1. Dataset overview
-- country: France
-- start_date: 2020-01-05
-- end_date: 2023-07-01
-- rows: 1274
-
-2. Estimation configuration
-- infectious_period_days: 14
-- gamma: 0.07142857
-- derivative_method: gradient
-- derivative_pre_smoothing_window: 1
-- beta_smoothing_window: 7
-- epsilon: 1e-08
-- min_infected_threshold: 10.0
-- min_denominator_SI_over_N: 1.0
-- population_column_used: population
-
-3. Validity diagnostics
-- valid beta points: 1141
-- invalid/NaN beta points: 133
-
-4. Summary statistics
-- beta_raw: count=1141, mean=0.107047, std=0.075933, min=-0.108043, p05=0.010788, p25=0.057868, p50=0.098208, p75=0.140651, p95=0.230646, max=1.071430
-- beta_smoothed: count=1141, mean=0.109004, std=0.080560, min=-0.053431, p05=0.013374, p25=0.058304, p50=0.097743, p75=0.143381, p95=0.232927, max=1.071430
-- R_eff_raw: count=1141, mean=1.072437, std=0.842657, min=-0.660299, p05=0.098370, p25=0.571332, p50=1.017461, p75=1.466815, p95=1.956674, max=15.000000
-- R_eff_smoothed: count=1141, mean=1.098157, std=0.946358, min=-0.326415, p05=0.122168, p25=0.597059, p50=1.032097, p75=1.440738, p95=1.967846, max=15.000000
-- R0_proxy_raw: count=1141, mean=1.498655, std=1.063059, min=-1.512606, p05=0.151029, p25=0.810147, p50=1.374917, p75=1.969116, p95=3.229043, max=15.000025
-- R0_proxy_smoothed: count=1141, mean=1.526053, std=1.127836, min=-0.748039, p05=0.187241, p25=0.816260, p50=1.368398, p75=2.007339, p95=3.260984, max=15.000025
-
-5. Methodological caveats
-- S, I, R are reconstructed proxies, not directly observed compartments.
-- beta(t) is inferred from estimated states and numerical derivatives.
-- Estimates near low I(t) values are unstable and masked by safeguards.
-
 SEIRD Preparation Report
 ----------------------------------------
 SEIRD Preparation Report
@@ -368,6 +261,7 @@ SEIRD Parameter Estimation Report
 2. Estimation configuration
 - latent_period_days: 5
 - infectious_period_days: 14
+- death_delay_days: 14
 - sigma: 0.20000000
 - gamma: 0.07142857
 - derivative_method: gradient
@@ -382,19 +276,20 @@ SEIRD Parameter Estimation Report
 3. Validity diagnostics
 - valid beta points: 1140
 - invalid beta points: 134
-- valid mu points: 1141
-- invalid mu points: 133
+- valid mu points: 1127
+- invalid mu points: 147
 
 4. Summary statistics
 - beta_raw: count=1140, mean=0.109668, std=0.053946, min=0.015497, p05=0.047284, p25=0.072677, p50=0.096317, p75=0.138200, p95=0.208659, max=0.600157
 - beta_smoothed: count=1140, mean=0.110736, std=0.055051, min=0.031954, p05=0.051986, p25=0.073504, p50=0.097476, p75=0.137221, p95=0.204602, max=0.600157
-- mu_raw: count=1141, mean=0.005008, std=0.124734, min=0.000000, p05=0.000000, p25=0.000000, p50=0.000000, p75=0.000328, p95=0.003996, max=4.187592
-- mu_smoothed: count=1141, mean=0.010854, std=0.152476, min=0.000048, p05=0.000067, p25=0.000150, p50=0.000355, p75=0.000723, p95=0.003326, max=4.187592
-- R_eff_proxy_raw: count=1140, mean=1.057233, std=0.545374, min=0.127695, p05=0.481996, p25=0.769922, p50=0.981268, p75=1.256955, p95=1.718317, max=8.400000
-- R_eff_proxy_smoothed: count=1140, mean=1.028144, std=0.363630, min=0.277107, p05=0.507417, p25=0.738619, p50=0.995956, p75=1.271963, p95=1.606160, max=2.883130
+- mu_raw: count=1127, mean=0.003195, std=0.072993, min=0.000000, p05=0.000000, p25=0.000000, p50=0.000000, p75=0.000294, p95=0.004349, max=2.435007
+- mu_smoothed: count=1127, mean=0.006637, std=0.089198, min=0.000048, p05=0.000066, p25=0.000138, p50=0.000329, p75=0.000891, p95=0.002864, max=2.435007
+- R_eff_proxy_raw: count=1127, mean=1.020915, std=0.377674, min=0.040953, p05=0.473144, p25=0.769329, p50=0.979689, p75=1.246219, p95=1.695184, max=2.727764
+- R_eff_proxy_smoothed: count=1127, mean=1.013189, std=0.352071, min=0.097029, p05=0.485368, p25=0.734606, p50=0.991224, p75=1.264186, p95=1.569499, max=2.253217
 
 5. Methodological caveats
 - Reconstructed compartments are proxies, not directly observed states.
-- Deaths are lagging indicators and affect mu(t) stability.
+- mu(t) is estimated with delayed infected states: dD/dt divided by I(t - death_delay_days).
+- Deaths are lagging indicators and still affect mu(t) stability.
 - Parameter estimates may be unstable when E or I are small.
 

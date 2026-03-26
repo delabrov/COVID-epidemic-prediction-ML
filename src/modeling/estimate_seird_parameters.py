@@ -127,24 +127,105 @@ def estimate_mu(
     df: pd.DataFrame,
     *,
     death_delay_days: int,
+    window: int,
     epsilon: float,
     min_infected_threshold: float,
 ) -> tuple[pd.Series, pd.Series]:
-    """Estimate mu(t) from delayed relation dD/dt = mu * I(t - death_delay_days)."""
+    """Estimate mu(t) with rolling integrated method: ΔD(window) / ΣI_lagged(window)."""
     if death_delay_days < 0:
         raise ValueError("death_delay_days must be >= 0")
+    if window <= 0:
+        raise ValueError("window must be > 0")
+    if "D_estimated" not in df.columns:
+        raise ValueError("Missing required column for mu estimation: D_estimated")
+    if "I_lagged_for_death" not in df.columns:
+        raise ValueError("Missing required column for mu estimation: I_lagged_for_death")
 
-    if "I_lagged_for_death" in df.columns:
-        infected_lagged = df["I_lagged_for_death"].astype(float)
-    else:
-        infected_lagged = df["I_estimated"].astype(float).shift(death_delay_days)
-    d_d_dt = df["dD_dt"].astype(float)
+    deaths_cumulative = df["D_estimated"].astype(float)
+    infected_lagged = df["I_lagged_for_death"].astype(float)
+
+    if deaths_cumulative.empty:
+        empty = pd.Series(index=df.index, dtype=float, name="mu_raw")
+        return empty, pd.Series(index=df.index, dtype=bool)
+
+    delta_d = deaths_cumulative - deaths_cumulative.shift(window)
+    # For first window points, use partial accumulation from the series start.
+    delta_d = delta_d.where(delta_d.notna(), deaths_cumulative - float(deaths_cumulative.iloc[0]))
+    infected_sum = infected_lagged.rolling(window=window, min_periods=1).sum()
     denom_threshold = max(float(epsilon), float(min_infected_threshold))
-
-    valid_mask = infected_lagged.abs() > denom_threshold
-    mu = (d_d_dt / infected_lagged).where(valid_mask)
+    valid_mask = (
+        (infected_sum >= denom_threshold)
+        & (delta_d >= 0.0)
+        & np.isfinite(infected_sum)
+        & np.isfinite(delta_d)
+    )
+    mu = (delta_d / (infected_sum + float(epsilon))).where(valid_mask)
+    mu = mu.replace([np.inf, -np.inf], np.nan)
     mu.name = "mu_raw"
     return mu, valid_mask
+
+
+def detect_mu_stable_start_date(
+    mu_smoothed: pd.Series,
+    *,
+    window_stability: int = 14,
+    k: float = 8.0,
+) -> pd.Timestamp | None:
+    """Detect first stable mu date using robust threshold median + k*MAD."""
+    mu_series = mu_smoothed.replace([np.inf, -np.inf], np.nan).dropna()
+    if mu_series.empty:
+        return None
+    if window_stability <= 0:
+        raise ValueError("window_stability must be > 0")
+
+    if len(mu_series) < window_stability:
+        LOGGER.warning(
+            "mu(t) stability detection skipped: too few points (%s < %s)",
+            len(mu_series),
+            window_stability,
+        )
+        return mu_series.index.min()
+
+    median_mu = float(mu_series.median())
+    mad_mu = float(np.median(np.abs(mu_series.to_numpy(dtype=float) - median_mu)))
+
+    if not np.isfinite(mad_mu) or mad_mu == 0.0:
+        std_mu = float(mu_series.std())
+        if not np.isfinite(std_mu) or std_mu == 0.0:
+            LOGGER.warning("mu(t) stability detection fallback: MAD/std are zero, no exclusion applied")
+            return mu_series.index.min()
+        mu_upper = median_mu + k * std_mu
+    else:
+        mu_upper = median_mu + k * mad_mu
+
+    stable_mask = (mu_smoothed < mu_upper) & mu_smoothed.notna()
+    unstable_mask = (mu_smoothed >= mu_upper) & mu_smoothed.notna()
+    stable_values = stable_mask.to_numpy(dtype=bool)
+    index_values = stable_mask.index
+
+    first_non_null = mu_smoothed.first_valid_index()
+    if not isinstance(first_non_null, pd.Timestamp):
+        return None
+    first_unstable = unstable_mask[unstable_mask].index.min() if unstable_mask.any() else None
+
+    if isinstance(first_unstable, pd.Timestamp):
+        search_start_ts = first_unstable
+    else:
+        search_start_ts = first_non_null
+
+    start_positions = np.where(index_values >= search_start_ts)[0]
+    if len(start_positions) == 0:
+        return first_non_null
+    search_start_pos = int(start_positions[0])
+
+    run_length = 0
+    for idx in range(search_start_pos, len(stable_values)):
+        is_stable = stable_values[idx]
+        run_length = run_length + 1 if is_stable else 0
+        if run_length >= window_stability:
+            return index_values[idx - window_stability + 1]
+
+    return first_non_null
 
 
 def estimate_beta(
@@ -266,7 +347,10 @@ def _build_parameter_report_text(
     lines.append("")
     lines.append("5. Methodological caveats")
     lines.append("- Reconstructed compartments are proxies, not directly observed states.")
-    lines.append("- mu(t) is estimated with delayed infected states: dD/dt divided by I(t - death_delay_days).")
+    lines.append(
+        f"- mu(t) is estimated with rolling integrated method over window={smoothing_window}: "
+        "ΔD / ΣI_lagged."
+    )
     lines.append("- Deaths are lagging indicators and still affect mu(t) stability.")
     lines.append("- Parameter estimates may be unstable when E or I are small.")
     lines.append("")
@@ -304,7 +388,11 @@ def run_seird_parameter_estimation_pipeline(
 
     sigma = estimate_sigma(latent_period_days)
     gamma = estimate_gamma(infectious_period_days)
-    LOGGER.info("SEIRD mu(t) delay setting: death_delay_days=%s", death_delay_days)
+    LOGGER.info(
+        "SEIRD mu(t) estimator: rolling integrated window=%s with death_delay_days=%s",
+        smoothing_window,
+        death_delay_days,
+    )
 
     enriched = dataset.copy()
     enriched["sigma"] = sigma
@@ -340,12 +428,25 @@ def run_seird_parameter_estimation_pipeline(
     mu_raw, mu_valid_mask = estimate_mu(
         enriched,
         death_delay_days=death_delay_days,
+        window=smoothing_window,
         epsilon=epsilon,
         min_infected_threshold=min_infected_threshold,
     )
     enriched["valid_mu_mask"] = mu_valid_mask
     enriched["mu_raw"] = mu_raw
     enriched["mu_smoothed"] = smooth_series(enriched["mu_raw"], smoothing_window)
+
+    valid_start_date = detect_mu_stable_start_date(enriched["mu_smoothed"], window_stability=14, k=8.0)
+    if valid_start_date is not None:
+        exclusion_mask = enriched.index < valid_start_date
+        if exclusion_mask.any():
+            enriched.loc[exclusion_mask, "mu_raw"] = np.nan
+            enriched.loc[exclusion_mask, "mu_smoothed"] = np.nan
+            enriched.loc[exclusion_mask, "valid_mu_mask"] = False
+            LOGGER.info("mu(t) exclusion applied before %s using median+MAD method", valid_start_date.date())
+    else:
+        LOGGER.warning("mu(t) exclusion skipped: no valid start date detected")
+
     enriched["mu_smoothed_nonnegative"] = enriched["mu_smoothed"].clip(lower=0)
 
     # Consistency terms for plotting diagnostics.

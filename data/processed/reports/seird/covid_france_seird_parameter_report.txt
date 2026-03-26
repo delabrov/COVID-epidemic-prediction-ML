@@ -10,6 +10,7 @@ SEIRD Parameter Estimation Report
 2. Estimation configuration
 - latent_period_days: 5
 - infectious_period_days: 14
+- death_delay_days: 14
 - sigma: 0.20000000
 - gamma: 0.07142857
 - derivative_method: gradient
@@ -24,18 +25,19 @@ SEIRD Parameter Estimation Report
 3. Validity diagnostics
 - valid beta points: 1140
 - invalid beta points: 134
-- valid mu points: 1141
-- invalid mu points: 133
+- valid mu points: 1059
+- invalid mu points: 215
 
 4. Summary statistics
 - beta_raw: count=1140, mean=0.109668, std=0.053946, min=0.015497, p05=0.047284, p25=0.072677, p50=0.096317, p75=0.138200, p95=0.208659, max=0.600157
 - beta_smoothed: count=1140, mean=0.110736, std=0.055051, min=0.031954, p05=0.051986, p25=0.073504, p50=0.097476, p75=0.137221, p95=0.204602, max=0.600157
-- mu_raw: count=1141, mean=0.005008, std=0.124734, min=0.000000, p05=0.000000, p25=0.000000, p50=0.000000, p75=0.000328, p95=0.003996, max=4.187592
-- mu_smoothed: count=1141, mean=0.010854, std=0.152476, min=0.000048, p05=0.000067, p25=0.000150, p50=0.000355, p75=0.000723, p95=0.003326, max=4.187592
-- R_eff_proxy_raw: count=1140, mean=1.057233, std=0.545374, min=0.127695, p05=0.481996, p25=0.769922, p50=0.981268, p75=1.256955, p95=1.718317, max=8.400000
-- R_eff_proxy_smoothed: count=1140, mean=1.028144, std=0.363630, min=0.277107, p05=0.507417, p25=0.738619, p50=0.995956, p75=1.271963, p95=1.606160, max=2.883130
+- mu_raw: count=1059, mean=0.000566, std=0.000658, min=0.000045, p05=0.000065, p25=0.000135, p50=0.000317, p75=0.000677, p95=0.002174, max=0.002996
+- mu_smoothed: count=1059, mean=0.000572, std=0.000659, min=0.000050, p05=0.000066, p25=0.000134, p50=0.000319, p75=0.000702, p95=0.002183, max=0.002919
+- R_eff_proxy_raw: count=1059, mean=1.020294, std=0.376602, min=0.127442, p05=0.470745, p25=0.766281, p50=0.989270, p75=1.247636, p95=1.670705, max=2.702595
+- R_eff_proxy_smoothed: count=1059, mean=1.020020, std=0.349372, min=0.361071, p05=0.509891, p25=0.734265, p50=0.993825, p75=1.267970, p95=1.580067, max=2.258428
 
 5. Methodological caveats
 - Reconstructed compartments are proxies, not directly observed states.
-- Deaths are lagging indicators and affect mu(t) stability.
+- mu(t) is estimated with rolling integrated method over window=7: ΔD / ΣI_lagged.
+- Deaths are lagging indicators and still affect mu(t) stability.
 - Parameter estimates may be unstable when E or I are small.

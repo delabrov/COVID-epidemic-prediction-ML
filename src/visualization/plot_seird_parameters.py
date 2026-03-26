@@ -117,6 +117,17 @@ def plot_seird_mu(df: pd.DataFrame, output_path: Path, country: str) -> Path:
         axis.plot(df.index, df["mu_raw"], alpha=0.35, linewidth=1.0, label="mu_raw")
     if "mu_smoothed" in df.columns:
         axis.plot(df.index, df["mu_smoothed"], linewidth=2.0, label="mu_smoothed")
+
+        valid_start = df["mu_smoothed"].first_valid_index()
+        if isinstance(valid_start, pd.Timestamp) and valid_start > df.index.min():
+            axis.axvspan(
+                df.index.min(),
+                valid_start,
+                alpha=0.3,
+                color="red",
+                label="Excluded unstable region",
+            )
+
     axis.axhline(0.0, linestyle="--", linewidth=1.0)
     axis.set_title(f"Estimated SEIRD mu(t) - {country}")
     axis.set_xlabel("Date")
