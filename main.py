@@ -135,8 +135,20 @@ def save_pipeline_terminal_output_report(
         lines.append(f"- SEIRD R_eff proxy plot: {seird_plots_result.get('reff_proxy_plot_path')}")
         lines.append(f"- SEIRD summary plot: {seird_plots_result.get('summary_plot_path')}")
         lines.append(
-            "- SEIRD observed vs reconstructed flows plot: "
-            f"{seird_plots_result.get('observed_vs_reconstructed_flows_plot_path')}"
+            "- SEIRD observed vs reconstructed cases plot: "
+            f"{seird_plots_result.get('observed_vs_reconstructed_cases_plot_path')}"
+        )
+        lines.append(
+            "- SEIRD observed vs reconstructed deaths plot: "
+            f"{seird_plots_result.get('observed_vs_reconstructed_deaths_plot_path')}"
+        )
+        lines.append(
+            "- SEIRD cases residual histogram: "
+            f"{seird_plots_result.get('cases_residual_histogram_plot_path')}"
+        )
+        lines.append(
+            "- SEIRD deaths residual histogram: "
+            f"{seird_plots_result.get('deaths_residual_histogram_plot_path')}"
         )
     lines.append("")
     lines.append("Temporal Validation Report")

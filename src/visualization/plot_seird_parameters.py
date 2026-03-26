@@ -12,6 +12,7 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
@@ -231,64 +232,201 @@ def plot_seird_summary(df: pd.DataFrame, output_path: Path, country: str) -> Pat
     return _save_figure(fig, output_path)
 
 
-def plot_seird_observed_vs_reconstructed_flows(
-    df: pd.DataFrame,
+def _align_series_for_metrics(observed: pd.Series, reconstructed: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """Align and filter finite non-null points for metric computation."""
+    mask = observed.notna() & reconstructed.notna() & np.isfinite(observed) & np.isfinite(reconstructed)
+    return observed.loc[mask], reconstructed.loc[mask]
+
+
+def _compute_fit_metrics(observed: pd.Series, reconstructed: pd.Series) -> tuple[float, float, float]:
+    """Compute R², RMSE and MAE on aligned points."""
+    aligned_obs, aligned_rec = _align_series_for_metrics(observed, reconstructed)
+    if aligned_obs.empty:
+        return float("nan"), float("nan"), float("nan")
+
+    residuals = aligned_obs - aligned_rec
+    mse = float(np.mean(np.square(residuals)))
+    rmse = float(np.sqrt(mse))
+    mae = float(np.mean(np.abs(residuals)))
+
+    ss_res = float(np.sum(np.square(residuals)))
+    centered = aligned_obs - float(np.mean(aligned_obs))
+    ss_tot = float(np.sum(np.square(centered)))
+    r2 = float("nan") if ss_tot <= 0.0 else 1.0 - (ss_res / ss_tot)
+    return r2, rmse, mae
+
+
+def _plot_flow_comparison_and_residuals(
+    *,
+    index: pd.Index,
+    observed: pd.Series,
+    reconstructed: pd.Series,
     output_path: Path,
-    country: str,
+    title: str,
+    observed_label: str,
+    reconstructed_label: str,
 ) -> Path | None:
-    """Compare observed case/death flows against reconstructed SEIRD flows."""
-    required_cases = ["new_cases_7d_avg", "sigma", "E_estimated"]
-    missing_cases = [column for column in required_cases if column not in df.columns]
-    if missing_cases:
-        LOGGER.warning(
-            "Skipping observed-vs-reconstructed SEIRD flow plot: missing case columns %s",
-            missing_cases,
-        )
+    residuals = observed - reconstructed
+    aligned_obs, aligned_rec = _align_series_for_metrics(observed, reconstructed)
+    if aligned_obs.empty:
+        LOGGER.warning("Skipping flow comparison plot (%s): no aligned non-null points", title)
         return None
 
-    infected_for_death_column = "I_lagged_for_death" if "I_lagged_for_death" in df.columns else "I_estimated"
-    required_deaths = ["new_deaths_7d_avg", "mu_smoothed", infected_for_death_column]
-    missing_deaths = [column for column in required_deaths if column not in df.columns]
-    if missing_deaths:
-        LOGGER.warning(
-            "Skipping observed-vs-reconstructed SEIRD flow plot: missing death columns %s",
-            missing_deaths,
-        )
-        return None
+    r2, rmse, mae = _compute_fit_metrics(observed, reconstructed)
 
-    observed_cases = df["new_cases_7d_avg"].astype(float)
-    reconstructed_cases = df["sigma"].astype(float) * df["E_estimated"].astype(float)
-    observed_deaths = df["new_deaths_7d_avg"].astype(float)
-    reconstructed_deaths = df["mu_smoothed"].astype(float) * df[infected_for_death_column].astype(float)
+    fig, axes = plt.subplots(2, 1, figsize=(12, 7), sharex=True, gridspec_kw={"height_ratios": [3, 1]})
+    top_axis, residual_axis = axes
 
-    fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    top_axis.plot(index, observed, linewidth=1.5, label=observed_label)
+    top_axis.plot(index, reconstructed, linewidth=1.5, color="red", label=reconstructed_label)
+    top_axis.set_title(title)
+    top_axis.set_ylabel("People/day")
+    top_axis.grid(alpha=0.2)
+    _safe_legend(top_axis)
 
-    axes[0].plot(df.index, observed_cases, linewidth=1.5, label="observed_cases (new_cases_7d_avg)")
-    axes[0].plot(  # sigma * E is the reconstructed transition into I.
-        df.index,
-        reconstructed_cases,
-        linewidth=1.5,
-        label="reconstructed_cases (sigma*E_estimated)",
+    rmse_display = str(int(round(rmse))) if np.isfinite(rmse) else "nan"
+    mae_display = str(int(round(mae))) if np.isfinite(mae) else "nan"
+    metrics_text = f"R²: {r2:.3f}\nRMSE: {rmse_display}\nMAE: {mae_display}"
+    residual_axis.text(
+        0.02,
+        0.98,
+        metrics_text,
+        transform=residual_axis.transAxes,
+        ha="left",
+        va="top",
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
     )
-    axes[0].set_title(f"Observed vs reconstructed case flow - {country}")
-    axes[0].set_ylabel("People/day")
-    axes[0].grid(alpha=0.2)
-    _safe_legend(axes[0])
 
-    axes[1].plot(df.index, observed_deaths, linewidth=1.5, label="observed_deaths (new_deaths_7d_avg)")
-    axes[1].plot(
-        df.index,
-        reconstructed_deaths,
-        linewidth=1.5,
-        label=f"reconstructed_deaths (mu*{infected_for_death_column})",
+    residual_axis.plot(
+        index,
+        residuals,
+        linewidth=1.2,
+        color="black",
+        label="Residuals (observed - reconstructed)",
     )
-    axes[1].set_title(f"Observed vs reconstructed death flow - {country}")
-    axes[1].set_ylabel("People/day")
-    axes[1].set_xlabel("Date")
-    axes[1].grid(alpha=0.2)
-    _safe_legend(axes[1])
-
+    residual_axis.axhline(0.0, linestyle="--", linewidth=1.0, color="gray")
+    residual_axis.set_ylabel("Residuals")
+    residual_axis.set_xlabel("Date")
+    residual_axis.grid(alpha=0.2)
+    _safe_legend(residual_axis)
     return _save_figure(fig, output_path)
+
+
+def _plot_residual_histogram(
+    residuals: pd.Series,
+    output_path: Path,
+    *,
+    title: str,
+    bins: int,
+    central_quantile_range: tuple[float, float] | None = None,
+) -> Path | None:
+    clean_residuals = residuals.replace([np.inf, -np.inf], np.nan).dropna()
+    if clean_residuals.empty:
+        LOGGER.warning("Skipping residual histogram (%s): no valid residuals", title)
+        return None
+
+    histogram_values = clean_residuals
+    if central_quantile_range is not None:
+        low_q, high_q = central_quantile_range
+        if 0.0 <= low_q < high_q <= 1.0:
+            lower = float(clean_residuals.quantile(low_q))
+            upper = float(clean_residuals.quantile(high_q))
+            if np.isfinite(lower) and np.isfinite(upper) and lower < upper:
+                histogram_values = clean_residuals[(clean_residuals >= lower) & (clean_residuals <= upper)]
+                if histogram_values.empty:
+                    histogram_values = clean_residuals
+
+    fig, axis = plt.subplots(figsize=(10, 5))
+    axis.hist(histogram_values, bins=bins, alpha=0.85, color="#4d4d4d")
+    axis.axvline(0.0, linestyle="--", linewidth=1.2, color="black")
+    axis.set_title(title)
+    axis.set_xlabel("Residual")
+    axis.set_ylabel("Frequency")
+    axis.grid(alpha=0.2)
+    return _save_figure(fig, output_path)
+
+
+def plot_seird_observed_vs_reconstructed_cases(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+    """Plot observed vs reconstructed cases with residuals."""
+    required_columns = ["new_cases_7d_avg", "sigma", "E_estimated"]
+    missing = [column for column in required_columns if column not in df.columns]
+    if missing:
+        LOGGER.warning("Skipping cases comparison plot: missing columns %s", missing)
+        return None
+
+    observed = df["new_cases_7d_avg"].astype(float)
+    reconstructed = df["sigma"].astype(float) * df["E_estimated"].astype(float)
+    return _plot_flow_comparison_and_residuals(
+        index=df.index,
+        observed=observed,
+        reconstructed=reconstructed,
+        output_path=output_path,
+        title=f"Observed vs reconstructed case flow - {country}",
+        observed_label="Observed cases (new_cases_7d_avg)",
+        reconstructed_label="Reconstructed cases (sigma*E_estimated)",
+    )
+
+
+def plot_seird_observed_vs_reconstructed_deaths(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+    """Plot observed vs reconstructed deaths with residuals."""
+    infected_column = "I_lagged_for_death" if "I_lagged_for_death" in df.columns else "I_estimated"
+    required_columns = ["new_deaths_7d_avg", "mu_smoothed", infected_column]
+    missing = [column for column in required_columns if column not in df.columns]
+    if missing:
+        LOGGER.warning("Skipping deaths comparison plot: missing columns %s", missing)
+        return None
+
+    observed = df["new_deaths_7d_avg"].astype(float)
+    reconstructed = df["mu_smoothed"].astype(float) * df[infected_column].astype(float)
+    return _plot_flow_comparison_and_residuals(
+        index=df.index,
+        observed=observed,
+        reconstructed=reconstructed,
+        output_path=output_path,
+        title=f"Observed vs reconstructed death flow - {country}",
+        observed_label="Observed deaths (new_deaths_7d_avg)",
+        reconstructed_label=f"Reconstructed deaths (mu*{infected_column})",
+    )
+
+
+def plot_seird_cases_residual_histogram(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+    """Plot histogram of case residuals."""
+    required_columns = ["new_cases_7d_avg", "sigma", "E_estimated"]
+    missing = [column for column in required_columns if column not in df.columns]
+    if missing:
+        LOGGER.warning("Skipping cases residual histogram: missing columns %s", missing)
+        return None
+
+    residuals = df["new_cases_7d_avg"].astype(float) - (
+        df["sigma"].astype(float) * df["E_estimated"].astype(float)
+    )
+    return _plot_residual_histogram(
+        residuals,
+        output_path,
+        title=f"Cases residual histogram - {country}",
+        bins=55,
+        central_quantile_range=(0.01, 0.99),
+    )
+
+
+def plot_seird_deaths_residual_histogram(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+    """Plot histogram of death residuals."""
+    infected_column = "I_lagged_for_death" if "I_lagged_for_death" in df.columns else "I_estimated"
+    required_columns = ["new_deaths_7d_avg", "mu_smoothed", infected_column]
+    missing = [column for column in required_columns if column not in df.columns]
+    if missing:
+        LOGGER.warning("Skipping deaths residual histogram: missing columns %s", missing)
+        return None
+
+    residuals = df["new_deaths_7d_avg"].astype(float) - (
+        df["mu_smoothed"].astype(float) * df[infected_column].astype(float)
+    )
+    return _plot_residual_histogram(
+        residuals,
+        output_path,
+        title=f"Deaths residual histogram - {country}",
+        bins=80,
+    )
 
 
 def generate_seird_parameter_plots(df: pd.DataFrame, output_dir: Path, country: str) -> dict[str, Path | None]:
@@ -302,9 +440,14 @@ def generate_seird_parameter_plots(df: pd.DataFrame, output_dir: Path, country: 
     consistency_path = output_dir / f"covid_{slug}_seird_consistency.png"
     reff_path = output_dir / f"covid_{slug}_seird_reff_proxy.png"
     summary_path = output_dir / f"covid_{slug}_seird_parameter_summary.png"
-    observed_vs_reconstructed_flows_path = (
-        output_dir / f"covid_{slug}_seird_observed_vs_reconstructed_flows.png"
+    observed_vs_reconstructed_cases_path = (
+        output_dir / f"covid_{slug}_seird_observed_vs_reconstructed_cases.png"
     )
+    observed_vs_reconstructed_deaths_path = (
+        output_dir / f"covid_{slug}_seird_observed_vs_reconstructed_deaths.png"
+    )
+    cases_residual_histogram_path = output_dir / f"covid_{slug}_seird_cases_residual_histogram.png"
+    deaths_residual_histogram_path = output_dir / f"covid_{slug}_seird_deaths_residual_histogram.png"
 
     return {
         "states_plot_path": plot_seird_states(dataset, states_path, country),
@@ -313,9 +456,24 @@ def generate_seird_parameter_plots(df: pd.DataFrame, output_dir: Path, country: 
         "consistency_plot_path": plot_seird_consistency(dataset, consistency_path, country),
         "reff_proxy_plot_path": plot_seird_reff_proxy(dataset, reff_path, country),
         "summary_plot_path": plot_seird_summary(dataset, summary_path, country),
-        "observed_vs_reconstructed_flows_plot_path": plot_seird_observed_vs_reconstructed_flows(
+        "observed_vs_reconstructed_cases_plot_path": plot_seird_observed_vs_reconstructed_cases(
             dataset,
-            observed_vs_reconstructed_flows_path,
+            observed_vs_reconstructed_cases_path,
+            country,
+        ),
+        "observed_vs_reconstructed_deaths_plot_path": plot_seird_observed_vs_reconstructed_deaths(
+            dataset,
+            observed_vs_reconstructed_deaths_path,
+            country,
+        ),
+        "cases_residual_histogram_plot_path": plot_seird_cases_residual_histogram(
+            dataset,
+            cases_residual_histogram_path,
+            country,
+        ),
+        "deaths_residual_histogram_plot_path": plot_seird_deaths_residual_histogram(
+            dataset,
+            deaths_residual_histogram_path,
             country,
         ),
     }
