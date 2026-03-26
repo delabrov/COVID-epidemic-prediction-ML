@@ -1,4 +1,4 @@
-"""Prepare SEIRD-ready dataset by reconstructing SEIRD state trajectories."""
+"""Prepare SEIRDV-ready dataset by reconstructing SEIRDV state trajectories."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ DEFAULT_INFECTIVITY_SCALE = 2.0
 DEFAULT_LATENT_PROFILE = "uniform"
 DEFAULT_LATENT_SHAPE = 2.0
 DEFAULT_LATENT_SCALE = 2.0
+DEFAULT_VACCINE_EFFICACY = 0.6
 
 
 def _slugify_country(country: str) -> str:
@@ -117,7 +118,28 @@ def _causal_convolution(signal: pd.Series, weights: np.ndarray) -> pd.Series:
     return pd.Series(conv, index=signal.index, dtype=float)
 
 
-def define_seird_framework(
+def _resolve_vaccination_series(df: pd.DataFrame, population: pd.Series) -> tuple[pd.Series, str]:
+    """Resolve vaccination stock series with fallback logic and safe cleaning."""
+    candidates = ["people_fully_vaccinated", "people_vaccinated"]
+    selected_column: str | None = None
+    for column in candidates:
+        if column in df.columns and df[column].notna().any():
+            selected_column = column
+            break
+
+    if selected_column is None:
+        raise ValueError(
+            "Missing vaccination stock columns: expected 'people_fully_vaccinated' "
+            "or fallback 'people_vaccinated'"
+        )
+
+    vaccinated = df[selected_column].astype(float)
+    vaccinated = vaccinated.clip(lower=0).interpolate(method="time").ffill().bfill()
+    vaccinated = vaccinated.cummax().clip(upper=population)
+    return vaccinated, selected_column
+
+
+def define_seirdv_framework(
     *,
     country: str,
     start_date: pd.Timestamp,
@@ -126,6 +148,7 @@ def define_seird_framework(
     deaths_signal: str,
     latent_period_days: int,
     infectious_period_days: int,
+    vaccine_efficacy: float,
     infectivity_profile: str,
     infectivity_shape: float,
     infectivity_scale: float,
@@ -133,7 +156,7 @@ def define_seird_framework(
     latent_shape: float,
     latent_scale: float,
 ) -> dict[str, Any]:
-    """Define SEIRD framework metadata and assumptions."""
+    """Define SEIRDV framework metadata and assumptions."""
     return {
         "country": country,
         "time_window": {
@@ -141,28 +164,33 @@ def define_seird_framework(
             "end_date": end_date.strftime("%Y-%m-%d"),
             "time_step": "1 day",
         },
-        "seird_equations": {
-            "dS_dt": "-beta * S * I / N",
-            "dE_dt": "beta * S * I / N - sigma * E",
-            "dI_dt": "sigma * E - gamma * I - mu * I",
-            "dR_dt": "gamma * I",
-            "dD_dt": "mu * I",
+        "seirdv_equations": {
+            "dS_dt": "-beta*S*I/N - nu*S",
+            "dV_dt": "nu*S - (1-epsilon_v)*beta*V*I/N",
+            "dE_dt": "beta*S*I/N + (1-epsilon_v)*beta*V*I/N - sigma*E",
+            "dI_dt": "sigma*E - gamma*I - mu*I",
+            "dR_dt": "gamma*I",
+            "dD_dt": "mu*I",
         },
         "observation_mapping": {
             "incidence_signal": cases_signal,
             "mortality_signal": deaths_signal,
+            "vaccination_stock_signal": "people_fully_vaccinated (fallback: people_vaccinated)",
         },
         "assumptions": [
             "Population N is approximately constant on selected window",
+            "Vaccination compartment V is directly observation-driven from vaccination stock columns",
+            "Vaccine efficacy epsilon_v is fixed as a model hyperparameter (not inferred)",
             "I_estimated is reconstructed by convolving observed cases with an infectivity profile",
             "E_estimated is reconstructed by convolving observed cases with a latent profile",
             "D_estimated uses total_deaths when available, otherwise cumulative smoothed deaths",
             "R_estimated is inferred from cumulative infections minus E, I, D",
-            "S_estimated is residual compartment: N - E - I - R - D",
+            "S_estimated is residual compartment: N - V - E - I - R - D",
         ],
         "reconstruction_hyperparameters": {
             "latent_period_days": latent_period_days,
             "infectious_period_days": infectious_period_days,
+            "vaccine_efficacy": vaccine_efficacy,
             "infectivity_profile": infectivity_profile,
             "infectivity_shape": infectivity_shape,
             "infectivity_scale": infectivity_scale,
@@ -173,7 +201,7 @@ def define_seird_framework(
     }
 
 
-def reconstruct_seird_states(
+def reconstruct_seirdv_states(
     df: pd.DataFrame,
     *,
     population_column: str,
@@ -188,20 +216,25 @@ def reconstruct_seird_states(
     latent_shape: float,
     latent_scale: float,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Reconstruct SEIRD states from observed smoothed signals."""
+    """Reconstruct SEIRDV states from observed signals."""
     if latent_period_days <= 0 or infectious_period_days <= 0:
         raise ValueError("latent_period_days and infectious_period_days must be > 0")
 
     out = df.copy()
-
     if population_column not in out.columns:
         raise ValueError(f"Population column missing: {population_column}")
+
     out[population_column] = out[population_column].astype(float).ffill().bfill()
     if out[population_column].isna().all():
         raise ValueError("Population column is fully missing after fill")
 
+    population = out[population_column].astype(float)
     observed_cases = out[cases_signal].astype(float).clip(lower=0).interpolate(method="time").ffill().bfill()
     deaths_signal_series = out[deaths_signal].astype(float).clip(lower=0).interpolate(method="time").ffill().bfill()
+
+    v_est, vaccination_column_used = _resolve_vaccination_series(out, population)
+    nu_flow_raw = v_est.diff().fillna(0.0).clip(lower=0.0)
+    nu_flow_smoothed = nu_flow_raw.rolling(window=7, min_periods=1).mean()
 
     infectivity_weights = build_profile_weights(
         infectious_period_days,
@@ -230,23 +263,40 @@ def reconstruct_seird_states(
         d_est = deaths_signal_series.cumsum()
 
     cumulative_infections = observed_cases.cumsum()
-    r_est = (cumulative_infections - i_est - e_est - d_est).clip(lower=0)
+    r_est = (cumulative_infections - e_est - i_est - d_est).clip(lower=0)
 
-    population = out[population_column].astype(float)
-    seird_sum = e_est + i_est + r_est + d_est
-    overflow = (seird_sum - population).clip(lower=0)
+    seirdv_sum = v_est + e_est + i_est + r_est + d_est
+    overflow = (seirdv_sum - population).clip(lower=0)
+    overflow_count = int((overflow > 0).sum())
     if float(overflow.max()) > 0:
+        LOGGER.info(
+            "SEIRDV reconstruction overflow detected on %s rows; clipping R_estimated to enforce compartment sum <= N",
+            overflow_count,
+        )
         r_est = (r_est - overflow).clip(lower=0)
 
-    s_est = (population - e_est - i_est - r_est - d_est).clip(lower=0)
+    s_raw = population - v_est - e_est - i_est - r_est - d_est
+    s_negative_count = int((s_raw < 0).sum())
+    if s_negative_count > 0:
+        LOGGER.info(
+            "SEIRDV reconstruction produced negative S on %s rows; clipping S_estimated at 0",
+            s_negative_count,
+        )
+    s_est = s_raw.clip(lower=0)
+    nu_rate = nu_flow_smoothed / s_est.where(s_est > 0, np.nan)
 
     out["observed_cases_signal"] = observed_cases
-    out["incidence_for_seird"] = observed_cases
-    out["deaths_for_seird"] = deaths_signal_series
+    out["incidence_for_seirdv"] = observed_cases
+    out["deaths_for_seirdv"] = deaths_signal_series
+    out["vaccination_column_used"] = vaccination_column_used
+    out["nu_flow_raw"] = nu_flow_raw
+    out["nu_flow_smoothed"] = nu_flow_smoothed
+    out["nu_rate_estimated"] = nu_rate
     out["cumulative_infections_estimated"] = cumulative_infections
     out["I_estimated_old"] = i_est_old
     out["E_estimated_old"] = e_est_old
     out["S_estimated"] = s_est
+    out["V_estimated"] = v_est
     out["E_estimated"] = e_est
     out["I_estimated"] = i_est
     out["R_estimated"] = r_est
@@ -269,6 +319,7 @@ def reconstruct_seird_states(
         "date": first_date.strftime("%Y-%m-%d"),
         "N": float(population.loc[first_date]),
         "S0": float(s_est.loc[first_date]),
+        "V0": float(v_est.loc[first_date]),
         "E0": float(e_est.loc[first_date]),
         "I0": float(i_est.loc[first_date]),
         "R0": float(r_est.loc[first_date]),
@@ -280,8 +331,8 @@ def reconstruct_seird_states(
         "start_date": out.index.min().strftime("%Y-%m-%d"),
         "end_date": out.index.max().strftime("%Y-%m-%d"),
         "cases_signal": cases_signal,
-        "observed_cases_signal_column": "observed_cases_signal",
         "deaths_signal": deaths_signal,
+        "vaccination_column_used": vaccination_column_used,
         "latent_period_days": latent_period_days,
         "infectious_period_days": infectious_period_days,
         "infectivity_profile": infectivity_profile,
@@ -290,6 +341,11 @@ def reconstruct_seird_states(
         "latent_weight_sum": float(np.sum(latent_weights)),
         "observed_cases_min": float(observed_cases.min()),
         "observed_cases_max": float(observed_cases.max()),
+        "vaccinated_min": float(v_est.min()),
+        "vaccinated_max": float(v_est.max()),
+        "nu_flow_max": float(nu_flow_raw.max()),
+        "overflow_clipped_count": overflow_count,
+        "s_negative_clipped_count": s_negative_count,
         "i_old_peak_date": i_est_old.idxmax().strftime("%Y-%m-%d"),
         "i_old_peak_value": float(i_est_old.max()),
         "i_new_peak_date": i_est.idxmax().strftime("%Y-%m-%d"),
@@ -308,8 +364,8 @@ def _build_preparation_report_text(
     population_column: str,
 ) -> str:
     lines: list[str] = []
-    lines.append("SEIRD Preparation Report")
-    lines.append("=" * 28)
+    lines.append("SEIRDV Preparation Report")
+    lines.append("=" * 29)
     lines.append("")
     lines.append("1. Framework definition")
     lines.append(json.dumps(framework, indent=2))
@@ -321,17 +377,18 @@ def _build_preparation_report_text(
     lines.append("")
     lines.append("3. Reconstruction variable definitions")
     lines.append("- observed_cases_signal: baseline observed incidence (new_cases_7d_avg or configured signal)")
+    lines.append("- V_estimated: vaccination stock from people_fully_vaccinated (fallback: people_vaccinated)")
+    lines.append("- nu_flow_raw / nu_flow_smoothed: daily vaccination flow estimated from V_estimated differences")
     lines.append("- I_estimated: observed_cases_signal convolved with infectivity profile weights")
     lines.append("- E_estimated: observed_cases_signal convolved with latent profile weights")
-    lines.append("- I_estimated_old / E_estimated_old: previous rolling-sum proxies kept for diagnostics")
     lines.append("- D_estimated: total_deaths if available else cumulative smoothed deaths signal")
-    lines.append("- R_estimated: cumulative observed infections - I_estimated - E_estimated - D_estimated")
-    lines.append("- S_estimated: N - E_estimated - I_estimated - R_estimated - D_estimated")
+    lines.append("- R_estimated: cumulative observed infections - E_estimated - I_estimated - D_estimated")
+    lines.append("- S_estimated: N - V_estimated - E_estimated - I_estimated - R_estimated - D_estimated")
     lines.append("")
     return "\n".join(lines)
 
 
-def run_seird_preparation_pipeline(
+def run_seirdv_preparation_pipeline(
     *,
     country: str,
     input_path: Path,
@@ -344,6 +401,7 @@ def run_seird_preparation_pipeline(
     population_column: str = DEFAULT_POPULATION_COLUMN,
     latent_period_days: int = 5,
     infectious_period_days: int = 14,
+    vaccine_efficacy: float = DEFAULT_VACCINE_EFFICACY,
     infectivity_profile: str = DEFAULT_INFECTIVITY_PROFILE,
     infectivity_shape: float = DEFAULT_INFECTIVITY_SHAPE,
     infectivity_scale: float = DEFAULT_INFECTIVITY_SCALE,
@@ -352,7 +410,10 @@ def run_seird_preparation_pipeline(
     latent_scale: float = DEFAULT_LATENT_SCALE,
     save_csv: bool = False,
 ) -> dict[str, Any]:
-    """Run SEIRD-ready dataset preparation pipeline."""
+    """Run SEIRDV-ready dataset preparation pipeline."""
+    if not (0.0 <= float(vaccine_efficacy) <= 1.0):
+        raise ValueError("vaccine_efficacy must be within [0, 1]")
+
     output_dir.mkdir(parents=True, exist_ok=True)
     reports_dir.mkdir(parents=True, exist_ok=True)
 
@@ -364,9 +425,9 @@ def run_seird_preparation_pipeline(
     dataset = _ensure_signal_columns(dataset, cases_signal=cases_signal, deaths_signal=deaths_signal)
     dataset = dataset.loc[parsed_start:parsed_end].copy()
     if dataset.empty:
-        raise ValueError("Selected SEIRD study window is empty after filtering")
+        raise ValueError("Selected SEIRDV study window is empty after filtering")
 
-    framework = define_seird_framework(
+    framework = define_seirdv_framework(
         country=country,
         start_date=parsed_start,
         end_date=parsed_end,
@@ -374,6 +435,7 @@ def run_seird_preparation_pipeline(
         deaths_signal=deaths_signal,
         latent_period_days=latent_period_days,
         infectious_period_days=infectious_period_days,
+        vaccine_efficacy=vaccine_efficacy,
         infectivity_profile=infectivity_profile,
         infectivity_shape=infectivity_shape,
         infectivity_scale=infectivity_scale,
@@ -382,7 +444,7 @@ def run_seird_preparation_pipeline(
         latent_scale=latent_scale,
     )
 
-    seird_ready_df, reconstruction_summary = reconstruct_seird_states(
+    seirdv_ready_df, reconstruction_summary = reconstruct_seirdv_states(
         dataset,
         population_column=population_column,
         cases_signal=cases_signal,
@@ -397,30 +459,30 @@ def run_seird_preparation_pipeline(
         latent_scale=latent_scale,
     )
 
-    ready_path = output_dir / f"covid_{country_slug}_seird_ready.parquet"
-    seird_ready_df.to_parquet(ready_path)
+    ready_path = output_dir / f"covid_{country_slug}_seirdv_ready.parquet"
+    seirdv_ready_df.to_parquet(ready_path)
 
     csv_path: Path | None = None
     if save_csv:
         csv_path = ready_path.with_suffix(".csv")
-        seird_ready_df.to_csv(csv_path, index=True)
+        seirdv_ready_df.to_csv(csv_path, index=True)
 
     report_text = _build_preparation_report_text(
         framework=framework,
         summary=reconstruction_summary,
         population_column=population_column,
     )
-    report_path = reports_dir / f"covid_{country_slug}_seird_preparation_report.txt"
+    report_path = reports_dir / f"covid_{country_slug}_seirdv_preparation_report.txt"
     report_path.write_text(report_text, encoding="utf-8")
 
-    print("\n=== SEIRD Preparation Summary ===")
+    print("\n=== SEIRDV Preparation Summary ===")
     print(report_text)
 
-    LOGGER.info("SEIRD-ready dataset saved: %s", ready_path)
-    LOGGER.info("SEIRD preparation report saved: %s", report_path)
+    LOGGER.info("SEIRDV-ready dataset saved: %s", ready_path)
+    LOGGER.info("SEIRDV preparation report saved: %s", report_path)
 
     return {
-        "dataset": seird_ready_df,
+        "dataset": seirdv_ready_df,
         "framework": framework,
         "reconstruction_summary": reconstruction_summary,
         "output_path": ready_path,
@@ -431,8 +493,8 @@ def run_seird_preparation_pipeline(
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI args for SEIRD preparation."""
-    parser = argparse.ArgumentParser(description="Prepare SEIRD-ready dataset")
+    """Parse CLI args for SEIRDV preparation."""
+    parser = argparse.ArgumentParser(description="Prepare SEIRDV-ready dataset")
     parser.add_argument("--country", type=str, default="France", help="Country label")
     parser.add_argument(
         "--input-path",
@@ -444,36 +506,27 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=Path("data/processed"),
-        help="Directory for SEIRD-ready dataset",
+        help="Directory for SEIRDV-ready dataset",
     )
     parser.add_argument(
         "--reports-dir",
         type=Path,
-        default=Path("data/processed/reports/seird"),
-        help="Directory for SEIRD preparation report",
+        default=Path("data/processed/reports/seirdv"),
+        help="Directory for SEIRDV preparation report",
     )
     parser.add_argument("--start-date", type=str, default=DEFAULT_START_DATE, help="Study window start date")
     parser.add_argument("--end-date", type=str, default=DEFAULT_END_DATE, help="Study window end date")
-    parser.add_argument(
-        "--cases-signal",
-        type=str,
-        default=DEFAULT_CASES_SIGNAL,
-        help="Incidence signal column",
-    )
-    parser.add_argument(
-        "--deaths-signal",
-        type=str,
-        default=DEFAULT_DEATHS_SIGNAL,
-        help="Deaths signal column",
-    )
-    parser.add_argument(
-        "--population-column",
-        type=str,
-        default=DEFAULT_POPULATION_COLUMN,
-        help="Population column",
-    )
+    parser.add_argument("--cases-signal", type=str, default=DEFAULT_CASES_SIGNAL, help="Incidence signal column")
+    parser.add_argument("--deaths-signal", type=str, default=DEFAULT_DEATHS_SIGNAL, help="Deaths signal column")
+    parser.add_argument("--population-column", type=str, default=DEFAULT_POPULATION_COLUMN, help="Population column")
     parser.add_argument("--latent-period-days", type=int, default=5, help="Latent period assumption")
     parser.add_argument("--infectious-period-days", type=int, default=14, help="Infectious period assumption")
+    parser.add_argument(
+        "--vaccine-efficacy",
+        type=float,
+        default=DEFAULT_VACCINE_EFFICACY,
+        help="Fixed vaccine protection against infection in [0, 1]",
+    )
     parser.add_argument(
         "--infectivity-profile",
         type=str,
@@ -492,7 +545,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--latent-shape", type=float, default=DEFAULT_LATENT_SHAPE)
     parser.add_argument("--latent-scale", type=float, default=DEFAULT_LATENT_SCALE)
-    parser.add_argument("--save-csv", action="store_true", help="Also save SEIRD-ready dataset as CSV")
+    parser.add_argument("--save-csv", action="store_true", help="Also save SEIRDV-ready dataset as CSV")
     return parser.parse_args()
 
 
@@ -500,7 +553,7 @@ def main() -> None:
     """CLI entrypoint."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
     args = parse_args()
-    run_seird_preparation_pipeline(
+    run_seirdv_preparation_pipeline(
         country=args.country,
         input_path=args.input_path,
         output_dir=args.output_dir,
@@ -512,6 +565,7 @@ def main() -> None:
         population_column=args.population_column,
         latent_period_days=args.latent_period_days,
         infectious_period_days=args.infectious_period_days,
+        vaccine_efficacy=args.vaccine_efficacy,
         infectivity_profile=args.infectivity_profile,
         infectivity_shape=args.infectivity_shape,
         infectivity_scale=args.infectivity_scale,

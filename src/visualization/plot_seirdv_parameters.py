@@ -1,4 +1,4 @@
-"""Generate SEIRD analysis plots from reconstructed states and estimated parameters."""
+"""Generate SEIRDV analysis plots from reconstructed states and estimated parameters."""
 
 from __future__ import annotations
 
@@ -16,6 +16,12 @@ import numpy as np
 import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
+
+FRANCE_LOCKDOWN_PERIODS: tuple[tuple[pd.Timestamp, pd.Timestamp], ...] = (
+    (pd.Timestamp("2020-03-17"), pd.Timestamp("2020-05-11")),
+    (pd.Timestamp("2020-10-30"), pd.Timestamp("2020-12-15")),
+    (pd.Timestamp("2021-04-03"), pd.Timestamp("2021-05-03")),
+)
 
 
 def _slugify_country(country: str) -> str:
@@ -37,10 +43,10 @@ def _ensure_datetime_index(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def load_seird_parameter_dataset(input_path: Path) -> pd.DataFrame:
-    """Load SEIRD parameter dataset."""
+def load_dataset(input_path: Path, *, label: str) -> pd.DataFrame:
+    """Load parameter dataset from parquet/csv."""
     if not input_path.exists():
-        raise FileNotFoundError(f"SEIRD parameter dataset not found: {input_path}")
+        raise FileNotFoundError(f"{label} dataset not found: {input_path}")
     suffix = input_path.suffix.lower()
     if suffix == ".parquet":
         df = pd.read_parquet(input_path)
@@ -49,6 +55,11 @@ def load_seird_parameter_dataset(input_path: Path) -> pd.DataFrame:
     else:
         raise ValueError(f"Unsupported input extension: {input_path.suffix}")
     return _ensure_datetime_index(df)
+
+
+def load_seirdv_parameter_dataset(input_path: Path) -> pd.DataFrame:
+    """Load SEIRDV parameter dataset."""
+    return load_dataset(input_path, label="SEIRDV parameter")
 
 
 def _save_figure(fig: plt.Figure, output_path: Path) -> Path:
@@ -66,44 +77,123 @@ def _safe_legend(axis: plt.Axes) -> None:
         axis.legend()
 
 
+def _add_france_lockdown_shading(axis: plt.Axes, index: pd.DatetimeIndex) -> None:
+    """Shade French lockdown periods with a fill-between band."""
+    if len(index) == 0:
+        return
+    y_min, y_max = axis.get_ylim()
+    y_low = np.full(len(index), y_min)
+    y_high = np.full(len(index), y_max)
+
+    has_label = False
+    for start, end in FRANCE_LOCKDOWN_PERIODS:
+        mask = (index >= start) & (index <= end)
+        if np.any(mask):
+            axis.fill_between(
+                index,
+                y_low,
+                y_high,
+                where=mask,
+                color="gray",
+                alpha=0.18,
+                label="Périodes de confinement (France)" if not has_label else None,
+            )
+            has_label = True
+    axis.set_ylim(y_min, y_max)
+
+
 def _resolve_population_column(df: pd.DataFrame) -> str:
     for column in ("population", "population_for_sir"):
         if column in df.columns:
             return column
-    raise ValueError("Population column missing in SEIRD parameter dataset")
+    raise ValueError("Population column missing in SEIRDV parameter dataset")
 
 
-def plot_seird_states(df: pd.DataFrame, output_path: Path, country: str) -> Path:
-    """Plot reconstructed SEIRD compartments normalized by population on log scale."""
+def plot_seirdv_states(df: pd.DataFrame, output_path: Path, country: str) -> Path:
+    """Plot reconstructed SEIRDV compartments in absolute values and normalized fractions."""
     population_column = _resolve_population_column(df)
     pop = df[population_column].astype(float)
 
-    fig, axis = plt.subplots(figsize=(12, 5))
-    for column in ["S_estimated", "E_estimated", "I_estimated", "R_estimated", "D_estimated"]:
+    fig, axes = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
+    columns = ["S_estimated", "V_estimated", "E_estimated", "I_estimated", "R_estimated", "D_estimated"]
+
+    for column in columns:
+        if column in df.columns:
+            axes[0].plot(df.index, df[column].astype(float), linewidth=1.3, label=column)
+    axes[0].set_title(f"Reconstructed SEIRDV States (absolute) - {country}")
+    axes[0].set_ylabel("People")
+    axes[0].grid(alpha=0.2)
+    _safe_legend(axes[0])
+
+    for column in columns:
         if column in df.columns:
             normalized = (df[column] / pop).astype(float)
-            # Log-scale plotting requires strictly positive values.
             normalized = normalized.where(normalized > 0)
-            axis.plot(df.index, normalized, linewidth=1.5, label=f"{column}/N")
-
-    axis.set_title(f"Reconstructed SEIRD States (normalized, log scale) - {country}")
-    axis.set_ylabel("Fraction of population (log scale)")
-    axis.set_xlabel("Date")
-    axis.set_yscale("log")
-    axis.grid(alpha=0.2)
-    _safe_legend(axis)
+            axes[1].plot(df.index, normalized, linewidth=1.3, label=f"{column}/N")
+    axes[1].set_title("Reconstructed SEIRDV States (normalized, log scale)")
+    axes[1].set_ylabel("Fraction of population (log)")
+    axes[1].set_xlabel("Date")
+    axes[1].set_yscale("log")
+    axes[1].grid(alpha=0.2)
+    _safe_legend(axes[1])
     return _save_figure(fig, output_path)
 
 
-def plot_seird_beta(df: pd.DataFrame, output_path: Path, country: str) -> Path:
+def plot_seirdv_vaccination_flow(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+    """Plot vaccination stock and estimated vaccination flows."""
+    required = ["V_estimated", "nu_flow_raw", "nu_flow_smoothed"]
+    missing = [column for column in required if column not in df.columns]
+    if missing:
+        LOGGER.warning("Skipping SEIRDV vaccination flow plot: missing columns %s", missing)
+        return None
+
+    fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    axes[0].plot(df.index, df["V_estimated"], linewidth=1.5, label="V_estimated")
+    axes[0].set_title(f"Vaccinated Compartment V(t) - {country}")
+    axes[0].set_ylabel("People")
+    axes[0].grid(alpha=0.2)
+    _safe_legend(axes[0])
+
+    axes[1].plot(df.index, df["nu_flow_raw"], linewidth=1.2, alpha=0.4, label="nu_flow_raw")
+    axes[1].plot(df.index, df["nu_flow_smoothed"], linewidth=1.7, label="nu_flow_smoothed")
+    axes[1].set_title("Vaccination Flow Estimates")
+    axes[1].set_ylabel("People/day")
+    axes[1].set_xlabel("Date")
+    axes[1].grid(alpha=0.2)
+    _safe_legend(axes[1])
+    return _save_figure(fig, output_path)
+
+
+def plot_seirdv_beta(df: pd.DataFrame, output_path: Path, country: str) -> Path:
     """Plot raw and smoothed beta estimates."""
     fig, axis = plt.subplots(figsize=(12, 5))
     if "beta_raw" in df.columns:
         axis.plot(df.index, df["beta_raw"], alpha=0.35, linewidth=1.0, label="beta_raw")
     if "beta_smoothed" in df.columns:
         axis.plot(df.index, df["beta_smoothed"], linewidth=2.0, label="beta_smoothed")
+        valid_start = df["beta_smoothed"].first_valid_index()
+        if isinstance(valid_start, pd.Timestamp) and valid_start > df.index.min():
+            axis.axvspan(
+                df.index.min(),
+                valid_start,
+                alpha=0.3,
+                color="red",
+                label="Excluded unstable region",
+            )
+            y_min, y_max = axis.get_ylim()
+            y_text = y_max - 0.08 * (y_max - y_min)
+            midpoint = df.index.min() + (valid_start - df.index.min()) / 2
+            axis.text(
+                midpoint,
+                y_text,
+                "Initial unstable phase\n(beta not reliable)",
+                color="red",
+                ha="center",
+                va="top",
+                fontsize=9,
+            )
     axis.axhline(0.0, linestyle="--", linewidth=1.0)
-    axis.set_title(f"Estimated SEIRD beta(t) - {country}")
+    axis.set_title(f"Estimated SEIRDV beta(t) - {country}")
     axis.set_xlabel("Date")
     axis.set_ylabel("beta")
     axis.grid(alpha=0.2)
@@ -111,8 +201,8 @@ def plot_seird_beta(df: pd.DataFrame, output_path: Path, country: str) -> Path:
     return _save_figure(fig, output_path)
 
 
-def plot_seird_mu(df: pd.DataFrame, output_path: Path, country: str) -> Path:
-    """Plot raw and smoothed mu estimates."""
+def plot_seirdv_mu(df: pd.DataFrame, output_path: Path, country: str) -> Path:
+    """Plot raw and smoothed mu estimates with excluded unstable region."""
     fig, axis = plt.subplots(figsize=(12, 5))
     if "mu_raw" in df.columns:
         axis.plot(df.index, df["mu_raw"], alpha=0.35, linewidth=1.0, label="mu_raw")
@@ -130,7 +220,7 @@ def plot_seird_mu(df: pd.DataFrame, output_path: Path, country: str) -> Path:
             )
 
     axis.axhline(0.0, linestyle="--", linewidth=1.0)
-    axis.set_title(f"Estimated SEIRD mu(t) - {country}")
+    axis.set_title(f"Estimated SEIRDV mu(t) - {country}")
     axis.set_xlabel("Date")
     axis.set_ylabel("mu")
     axis.grid(alpha=0.2)
@@ -138,38 +228,10 @@ def plot_seird_mu(df: pd.DataFrame, output_path: Path, country: str) -> Path:
     return _save_figure(fig, output_path)
 
 
-def plot_seird_consistency(df: pd.DataFrame, output_path: Path, country: str) -> Path:
-    """Plot consistency terms for dE/dt and dD/dt identities."""
-    fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-
-    if "dE_dt" in df.columns:
-        axes[0].plot(df.index, df["dE_dt"], linewidth=1.4, label="dE_dt")
-    if "beta_s_i_over_n_smoothed" in df.columns:
-        axes[0].plot(df.index, df["beta_s_i_over_n_smoothed"], linewidth=1.4, label="beta*S*I/N (smoothed)")
-    if "sigma_e_term" in df.columns:
-        axes[0].plot(df.index, df["sigma_e_term"], linewidth=1.4, label="sigma*E")
-    axes[0].set_title(f"SEIRD Exposed Equation Consistency - {country}")
-    axes[0].set_ylabel("People/day")
-    axes[0].grid(alpha=0.2)
-    _safe_legend(axes[0])
-
-    if "dD_dt" in df.columns:
-        axes[1].plot(df.index, df["dD_dt"], linewidth=1.4, label="dD_dt")
-    if "mu_i_term_smoothed" in df.columns:
-        axes[1].plot(df.index, df["mu_i_term_smoothed"], linewidth=1.4, label="mu*I_lagged (smoothed)")
-    axes[1].set_title("SEIRD Death Equation Consistency")
-    axes[1].set_ylabel("People/day")
-    axes[1].set_xlabel("Date")
-    axes[1].grid(alpha=0.2)
-    _safe_legend(axes[1])
-
-    return _save_figure(fig, output_path)
-
-
-def plot_seird_reff_proxy(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+def plot_seirdv_reff_proxy(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
     """Plot raw and smoothed R_eff proxy when available."""
     if "R_eff_proxy_raw" not in df.columns and "R_eff_proxy_smoothed" not in df.columns:
-        LOGGER.warning("Skipping R_eff proxy plot: required columns not found")
+        LOGGER.warning("Skipping SEIRDV R_eff proxy plot: required columns not found")
         return None
 
     fig, axis = plt.subplots(figsize=(12, 5))
@@ -178,7 +240,7 @@ def plot_seird_reff_proxy(df: pd.DataFrame, output_path: Path, country: str) -> 
     if "R_eff_proxy_smoothed" in df.columns:
         axis.plot(df.index, df["R_eff_proxy_smoothed"], linewidth=2.0, label="R_eff_proxy_smoothed")
     axis.axhline(1.0, linestyle="--", linewidth=1.0)
-    axis.set_title(f"SEIRD Effective Reproduction Proxy - {country}")
+    axis.set_title(f"SEIRDV Effective Reproduction Proxy - {country}")
     axis.set_xlabel("Date")
     axis.set_ylabel("R_eff_proxy")
     axis.grid(alpha=0.2)
@@ -186,13 +248,13 @@ def plot_seird_reff_proxy(df: pd.DataFrame, output_path: Path, country: str) -> 
     return _save_figure(fig, output_path)
 
 
-def plot_seird_summary(df: pd.DataFrame, output_path: Path, country: str) -> Path:
-    """Plot multi-panel SEIRD summary."""
+def plot_seirdv_summary(df: pd.DataFrame, output_path: Path, country: str) -> Path:
+    """Plot multi-panel SEIRDV summary."""
     fig, axes = plt.subplots(5, 1, figsize=(12, 12), sharex=True)
 
-    if "E_estimated" in df.columns:
-        axes[0].plot(df.index, df["E_estimated"], label="E_estimated")
-    axes[0].set_title(f"E_estimated - {country}")
+    if "V_estimated" in df.columns:
+        axes[0].plot(df.index, df["V_estimated"], label="V_estimated")
+    axes[0].set_title(f"V_estimated - {country}")
     axes[0].set_ylabel("People")
     axes[0].grid(alpha=0.2)
     _safe_legend(axes[0])
@@ -346,12 +408,12 @@ def _plot_residual_histogram(
     return _save_figure(fig, output_path)
 
 
-def plot_seird_observed_vs_reconstructed_cases(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+def plot_seirdv_observed_vs_reconstructed_cases(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
     """Plot observed vs reconstructed cases with residuals."""
     required_columns = ["new_cases_7d_avg", "sigma", "E_estimated"]
     missing = [column for column in required_columns if column not in df.columns]
     if missing:
-        LOGGER.warning("Skipping cases comparison plot: missing columns %s", missing)
+        LOGGER.warning("Skipping SEIRDV cases comparison plot: missing columns %s", missing)
         return None
 
     observed = df["new_cases_7d_avg"].astype(float)
@@ -367,13 +429,13 @@ def plot_seird_observed_vs_reconstructed_cases(df: pd.DataFrame, output_path: Pa
     )
 
 
-def plot_seird_observed_vs_reconstructed_deaths(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+def plot_seirdv_observed_vs_reconstructed_deaths(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
     """Plot observed vs reconstructed deaths with residuals."""
     infected_column = "I_lagged_for_death" if "I_lagged_for_death" in df.columns else "I_estimated"
     required_columns = ["new_deaths_7d_avg", "mu_smoothed", infected_column]
     missing = [column for column in required_columns if column not in df.columns]
     if missing:
-        LOGGER.warning("Skipping deaths comparison plot: missing columns %s", missing)
+        LOGGER.warning("Skipping SEIRDV deaths comparison plot: missing columns %s", missing)
         return None
 
     observed = df["new_deaths_7d_avg"].astype(float)
@@ -389,12 +451,47 @@ def plot_seird_observed_vs_reconstructed_deaths(df: pd.DataFrame, output_path: P
     )
 
 
-def plot_seird_cases_residual_histogram(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+def plot_seirdv_observed_vs_reconstructed_with_lockdowns(
+    df: pd.DataFrame,
+    output_path: Path,
+    country: str,
+) -> Path | None:
+    """Plot observed cases/deaths in one figure with French lockdown shading."""
+    required_columns = ["new_cases_7d_avg", "new_deaths_7d_avg"]
+    missing = [column for column in required_columns if column not in df.columns]
+    if missing:
+        LOGGER.warning("Skipping SEIRDV lockdown comparison plot: missing columns %s", missing)
+        return None
+
+    observed_cases = df["new_cases_7d_avg"].astype(float)
+    observed_deaths = df["new_deaths_7d_avg"].astype(float)
+
+    fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+
+    axes[0].plot(df.index, observed_cases, linewidth=1.5, label="Observed cases")
+    _add_france_lockdown_shading(axes[0], pd.DatetimeIndex(df.index))
+    axes[0].set_title(f"Observed cases with lockdown periods - {country}")
+    axes[0].set_ylabel("People/day")
+    axes[0].grid(alpha=0.2)
+    _safe_legend(axes[0])
+
+    axes[1].plot(df.index, observed_deaths, linewidth=1.5, label="Observed deaths")
+    _add_france_lockdown_shading(axes[1], pd.DatetimeIndex(df.index))
+    axes[1].set_title("Observed deaths with lockdown periods")
+    axes[1].set_ylabel("People/day")
+    axes[1].set_xlabel("Date")
+    axes[1].grid(alpha=0.2)
+    _safe_legend(axes[1])
+
+    return _save_figure(fig, output_path)
+
+
+def plot_seirdv_cases_residual_histogram(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
     """Plot histogram of case residuals."""
     required_columns = ["new_cases_7d_avg", "sigma", "E_estimated"]
     missing = [column for column in required_columns if column not in df.columns]
     if missing:
-        LOGGER.warning("Skipping cases residual histogram: missing columns %s", missing)
+        LOGGER.warning("Skipping SEIRDV cases residual histogram: missing columns %s", missing)
         return None
 
     residuals = df["new_cases_7d_avg"].astype(float) - (
@@ -403,19 +500,19 @@ def plot_seird_cases_residual_histogram(df: pd.DataFrame, output_path: Path, cou
     return _plot_residual_histogram(
         residuals,
         output_path,
-        title=f"Cases residual histogram - {country}",
+        title=f"SEIRDV cases residual histogram - {country}",
         bins=55,
         central_quantile_range=(0.01, 0.99),
     )
 
 
-def plot_seird_deaths_residual_histogram(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+def plot_seirdv_deaths_residual_histogram(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
     """Plot histogram of death residuals."""
     infected_column = "I_lagged_for_death" if "I_lagged_for_death" in df.columns else "I_estimated"
     required_columns = ["new_deaths_7d_avg", "mu_smoothed", infected_column]
     missing = [column for column in required_columns if column not in df.columns]
     if missing:
-        LOGGER.warning("Skipping deaths residual histogram: missing columns %s", missing)
+        LOGGER.warning("Skipping SEIRDV deaths residual histogram: missing columns %s", missing)
         return None
 
     residuals = df["new_deaths_7d_avg"].astype(float) - (
@@ -424,7 +521,7 @@ def plot_seird_deaths_residual_histogram(df: pd.DataFrame, output_path: Path, co
     return _plot_residual_histogram(
         residuals,
         output_path,
-        title=f"Deaths residual histogram - {country}",
+        title=f"SEIRDV deaths residual histogram - {country}",
         bins=80,
     )
 
@@ -446,12 +543,12 @@ def _extract_lag_weights(df: pd.DataFrame, *, prefix: str) -> tuple[np.ndarray, 
     return lags, weights
 
 
-def plot_seird_profiles(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+def plot_seirdv_profiles(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
     """Plot infectivity and latent profile weights over lag days."""
     infectivity = _extract_lag_weights(df, prefix="infectivity_weight_lag_")
     latent = _extract_lag_weights(df, prefix="latent_weight_lag_")
     if infectivity is None or latent is None:
-        LOGGER.warning("Skipping profile plot: missing infectivity or latent weight columns")
+        LOGGER.warning("Skipping SEIRDV profile plot: missing infectivity or latent weight columns")
         return None
 
     lags_i, weights_i = infectivity
@@ -459,158 +556,177 @@ def plot_seird_profiles(df: pd.DataFrame, output_path: Path, country: str) -> Pa
 
     fig, axes = plt.subplots(2, 1, figsize=(10, 7), sharex=False)
     axes[0].bar(lags_i, weights_i, width=0.8, alpha=0.9)
-    axes[0].set_title(f"Infectivity Profile Weights - {country}")
+    axes[0].set_title(f"SEIRDV Infectivity Profile Weights - {country}")
     axes[0].set_ylabel("Weight")
     axes[0].set_xlabel("Lag day")
     axes[0].grid(alpha=0.2)
 
     axes[1].bar(lags_e, weights_e, width=0.8, alpha=0.9)
-    axes[1].set_title("Latent Profile Weights")
+    axes[1].set_title("SEIRDV Latent Profile Weights")
     axes[1].set_ylabel("Weight")
     axes[1].set_xlabel("Lag day")
     axes[1].grid(alpha=0.2)
     return _save_figure(fig, output_path)
 
 
-def _plot_reconstruction_comparison(
+def plot_seird_vs_seirdv_comparison(
+    seirdv_df: pd.DataFrame,
     *,
-    df: pd.DataFrame,
-    old_column: str,
-    new_column: str,
+    seird_parameter_path: Path,
     output_path: Path,
-    title: str,
-    y_label: str,
+    country: str,
 ) -> Path | None:
-    if old_column not in df.columns or new_column not in df.columns:
+    """Plot SEIRD vs SEIRDV comparison of key trajectories and parameters."""
+    if not seird_parameter_path.exists():
+        LOGGER.warning("Skipping SEIRD vs SEIRDV comparison: missing SEIRD dataset at %s", seird_parameter_path)
+        return None
+
+    try:
+        seird_df = load_dataset(seird_parameter_path, label="SEIRD parameter")
+    except Exception as exc:  # pragma: no cover - defensive branch
+        LOGGER.warning("Skipping SEIRD vs SEIRDV comparison: failed to load SEIRD dataset (%s)", exc)
+        return None
+
+    required = ["I_estimated", "beta_smoothed", "mu_smoothed", "R_eff_proxy_smoothed"]
+    missing_seird = [column for column in required if column not in seird_df.columns]
+    missing_seirdv = [column for column in required if column not in seirdv_df.columns]
+    if missing_seird or missing_seirdv:
         LOGGER.warning(
-            "Skipping reconstruction comparison plot (%s): missing columns %s",
-            title,
-            [column for column in [old_column, new_column] if column not in df.columns],
+            "Skipping SEIRD vs SEIRDV comparison: missing columns (SEIRD=%s, SEIRDV=%s)",
+            missing_seird,
+            missing_seirdv,
         )
         return None
 
-    old_series = df[old_column].astype(float)
-    new_series = df[new_column].astype(float)
-    residual = new_series - old_series
+    common_index = seird_df.index.intersection(seirdv_df.index)
+    if len(common_index) == 0:
+        LOGGER.warning("Skipping SEIRD vs SEIRDV comparison: no common dates")
+        return None
 
-    fig, axes = plt.subplots(2, 1, figsize=(12, 7), sharex=True, gridspec_kw={"height_ratios": [3, 1]})
-    axes[0].plot(df.index, old_series, linewidth=1.4, label=old_column)
-    axes[0].plot(df.index, new_series, linewidth=1.6, label=new_column)
-    axes[0].set_title(title)
-    axes[0].set_ylabel(y_label)
+    seird = seird_df.loc[common_index]
+    seirdv = seirdv_df.loc[common_index]
+
+    fig, axes = plt.subplots(4, 1, figsize=(12, 12), sharex=True)
+
+    axes[0].plot(common_index, seird["I_estimated"], linewidth=1.4, label="SEIRD I_estimated")
+    axes[0].plot(common_index, seirdv["I_estimated"], linewidth=1.4, label="SEIRDV I_estimated")
+    axes[0].set_title(f"SEIRD vs SEIRDV comparison - {country}")
+    axes[0].set_ylabel("I (people)")
     axes[0].grid(alpha=0.2)
     _safe_legend(axes[0])
 
-    axes[1].plot(df.index, residual, linewidth=1.2, color="black", label="new - old")
-    axes[1].axhline(0.0, linestyle="--", linewidth=1.0, color="gray")
-    axes[1].set_ylabel("Residual")
-    axes[1].set_xlabel("Date")
+    axes[1].plot(common_index, seird["beta_smoothed"], linewidth=1.4, label="SEIRD beta_smoothed")
+    axes[1].plot(common_index, seirdv["beta_smoothed"], linewidth=1.4, label="SEIRDV beta_smoothed")
+    axes[1].set_ylabel("beta")
     axes[1].grid(alpha=0.2)
     _safe_legend(axes[1])
+
+    axes[2].plot(common_index, seird["mu_smoothed"], linewidth=1.4, label="SEIRD mu_smoothed")
+    axes[2].plot(common_index, seirdv["mu_smoothed"], linewidth=1.4, label="SEIRDV mu_smoothed")
+    axes[2].set_ylabel("mu")
+    axes[2].grid(alpha=0.2)
+    _safe_legend(axes[2])
+
+    axes[3].plot(common_index, seird["R_eff_proxy_smoothed"], linewidth=1.4, label="SEIRD R_eff_proxy_smoothed")
+    axes[3].plot(common_index, seirdv["R_eff_proxy_smoothed"], linewidth=1.4, label="SEIRDV R_eff_proxy_smoothed")
+    axes[3].axhline(1.0, linestyle="--", linewidth=1.0)
+    axes[3].set_ylabel("R_eff_proxy")
+    axes[3].set_xlabel("Date")
+    axes[3].grid(alpha=0.2)
+    _safe_legend(axes[3])
+
     return _save_figure(fig, output_path)
 
 
-def plot_seird_i_reconstruction_comparison(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
-    """Compare old rolling I reconstruction vs new convolution-based I reconstruction."""
-    return _plot_reconstruction_comparison(
-        df=df,
-        old_column="I_estimated_old",
-        new_column="I_estimated",
-        output_path=output_path,
-        title=f"Old vs new I reconstruction - {country}",
-        y_label="People",
-    )
-
-
-def plot_seird_e_reconstruction_comparison(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
-    """Compare old rolling E reconstruction vs new convolution-based E reconstruction."""
-    return _plot_reconstruction_comparison(
-        df=df,
-        old_column="E_estimated_old",
-        new_column="E_estimated",
-        output_path=output_path,
-        title=f"Old vs new E reconstruction - {country}",
-        y_label="People",
-    )
-
-
-def generate_seird_parameter_plots(df: pd.DataFrame, output_dir: Path, country: str) -> dict[str, Path | None]:
-    """Generate full SEIRD analysis plot set."""
+def generate_seirdv_parameter_plots(
+    df: pd.DataFrame,
+    *,
+    output_dir: Path,
+    country: str,
+    seird_parameter_path: Path | None = None,
+) -> dict[str, Path | None]:
+    """Generate full SEIRDV analysis plot set."""
     dataset = _ensure_datetime_index(df)
     slug = _slugify_country(country)
 
-    states_path = output_dir / f"covid_{slug}_seird_states.png"
-    beta_path = output_dir / f"covid_{slug}_seird_beta_estimates.png"
-    mu_path = output_dir / f"covid_{slug}_seird_mu_estimates.png"
-    consistency_path = output_dir / f"covid_{slug}_seird_consistency.png"
-    reff_path = output_dir / f"covid_{slug}_seird_reff_proxy.png"
-    summary_path = output_dir / f"covid_{slug}_seird_parameter_summary.png"
-    observed_vs_reconstructed_cases_path = (
-        output_dir / f"covid_{slug}_seird_observed_vs_reconstructed_cases.png"
+    states_path = output_dir / f"covid_{slug}_seirdv_states.png"
+    vaccination_flow_path = output_dir / f"covid_{slug}_seirdv_vaccination_flow.png"
+    beta_path = output_dir / f"covid_{slug}_seirdv_beta_estimates.png"
+    mu_path = output_dir / f"covid_{slug}_seirdv_mu_estimates.png"
+    reff_path = output_dir / f"covid_{slug}_seirdv_reff_proxy.png"
+    summary_path = output_dir / f"covid_{slug}_seirdv_parameter_summary.png"
+    observed_vs_reconstructed_cases_path = output_dir / f"covid_{slug}_seirdv_observed_vs_reconstructed_cases.png"
+    observed_vs_reconstructed_deaths_path = output_dir / f"covid_{slug}_seirdv_observed_vs_reconstructed_deaths.png"
+    observed_vs_reconstructed_lockdowns_path = (
+        output_dir / f"covid_{slug}_seirdv_observed_vs_reconstructed_lockdowns.png"
     )
-    observed_vs_reconstructed_deaths_path = (
-        output_dir / f"covid_{slug}_seird_observed_vs_reconstructed_deaths.png"
-    )
-    cases_residual_histogram_path = output_dir / f"covid_{slug}_seird_cases_residual_histogram.png"
-    deaths_residual_histogram_path = output_dir / f"covid_{slug}_seird_deaths_residual_histogram.png"
-    profiles_path = output_dir / f"covid_{slug}_seird_profiles.png"
-    i_reconstruction_path = output_dir / f"covid_{slug}_seird_i_reconstruction_comparison.png"
-    e_reconstruction_path = output_dir / f"covid_{slug}_seird_e_reconstruction_comparison.png"
+    cases_residual_histogram_path = output_dir / f"covid_{slug}_seirdv_cases_residual_histogram.png"
+    deaths_residual_histogram_path = output_dir / f"covid_{slug}_seirdv_deaths_residual_histogram.png"
+    profiles_path = output_dir / f"covid_{slug}_seirdv_profiles.png"
+    comparison_path = output_dir / f"covid_{slug}_seirdv_compartment_comparison.png"
 
     return {
-        "states_plot_path": plot_seird_states(dataset, states_path, country),
-        "beta_plot_path": plot_seird_beta(dataset, beta_path, country),
-        "mu_plot_path": plot_seird_mu(dataset, mu_path, country),
-        "consistency_plot_path": plot_seird_consistency(dataset, consistency_path, country),
-        "reff_proxy_plot_path": plot_seird_reff_proxy(dataset, reff_path, country),
-        "summary_plot_path": plot_seird_summary(dataset, summary_path, country),
-        "observed_vs_reconstructed_cases_plot_path": plot_seird_observed_vs_reconstructed_cases(
+        "states_plot_path": plot_seirdv_states(dataset, states_path, country),
+        "vaccination_flow_plot_path": plot_seirdv_vaccination_flow(dataset, vaccination_flow_path, country),
+        "beta_plot_path": plot_seirdv_beta(dataset, beta_path, country),
+        "mu_plot_path": plot_seirdv_mu(dataset, mu_path, country),
+        "reff_proxy_plot_path": plot_seirdv_reff_proxy(dataset, reff_path, country),
+        "summary_plot_path": plot_seirdv_summary(dataset, summary_path, country),
+        "observed_vs_reconstructed_cases_plot_path": plot_seirdv_observed_vs_reconstructed_cases(
             dataset,
             observed_vs_reconstructed_cases_path,
             country,
         ),
-        "observed_vs_reconstructed_deaths_plot_path": plot_seird_observed_vs_reconstructed_deaths(
+        "observed_vs_reconstructed_deaths_plot_path": plot_seirdv_observed_vs_reconstructed_deaths(
             dataset,
             observed_vs_reconstructed_deaths_path,
             country,
         ),
-        "cases_residual_histogram_plot_path": plot_seird_cases_residual_histogram(
+        "observed_vs_reconstructed_lockdowns_plot_path": plot_seirdv_observed_vs_reconstructed_with_lockdowns(
+            dataset,
+            observed_vs_reconstructed_lockdowns_path,
+            country,
+        ),
+        "cases_residual_histogram_plot_path": plot_seirdv_cases_residual_histogram(
             dataset,
             cases_residual_histogram_path,
             country,
         ),
-        "deaths_residual_histogram_plot_path": plot_seird_deaths_residual_histogram(
+        "deaths_residual_histogram_plot_path": plot_seirdv_deaths_residual_histogram(
             dataset,
             deaths_residual_histogram_path,
             country,
         ),
-        "profiles_plot_path": plot_seird_profiles(dataset, profiles_path, country),
-        "i_reconstruction_comparison_plot_path": plot_seird_i_reconstruction_comparison(
+        "profiles_plot_path": plot_seirdv_profiles(dataset, profiles_path, country),
+        "comparison_plot_path": plot_seird_vs_seirdv_comparison(
             dataset,
-            i_reconstruction_path,
-            country,
-        ),
-        "e_reconstruction_comparison_plot_path": plot_seird_e_reconstruction_comparison(
-            dataset,
-            e_reconstruction_path,
-            country,
+            seird_parameter_path=(
+                seird_parameter_path if seird_parameter_path is not None else Path("data/processed/covid_france_seird_parameters.parquet")
+            ),
+            output_path=comparison_path,
+            country=country,
         ),
     }
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI args for SEIRD plotting."""
-    parser = argparse.ArgumentParser(description="Generate SEIRD parameter analysis plots")
+    """Parse CLI args for SEIRDV plotting."""
+    parser = argparse.ArgumentParser(description="Generate SEIRDV parameter analysis plots")
     parser.add_argument("--country", type=str, default="France")
     parser.add_argument(
         "--input-path",
         type=Path,
-        default=Path("data/processed/covid_france_seird_parameters.parquet"),
+        default=Path("data/processed/covid_france_seirdv_parameters.parquet"),
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("outputs/figures/seird"),
+        default=Path("outputs/figures/seirdv"),
+    )
+    parser.add_argument(
+        "--seird-parameter-path",
+        type=Path,
+        default=Path("data/processed/covid_france_seird_parameters.parquet"),
     )
     return parser.parse_args()
 
@@ -619,8 +735,13 @@ def main() -> None:
     """CLI entrypoint."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
     args = parse_args()
-    dataset = load_seird_parameter_dataset(args.input_path)
-    generate_seird_parameter_plots(dataset, args.output_dir, country=args.country)
+    dataset = load_seirdv_parameter_dataset(args.input_path)
+    generate_seirdv_parameter_plots(
+        dataset,
+        output_dir=args.output_dir,
+        country=args.country,
+        seird_parameter_path=args.seird_parameter_path,
+    )
 
 
 if __name__ == "__main__":

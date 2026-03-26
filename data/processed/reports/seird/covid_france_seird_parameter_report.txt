@@ -23,18 +23,18 @@ SEIRD Parameter Estimation Report
 - population_column: population
 
 3. Validity diagnostics
-- valid beta points: 1140
-- invalid beta points: 134
-- valid mu points: 1059
-- invalid mu points: 215
+- valid beta points: 1141
+- invalid beta points: 133
+- valid mu points: 1060
+- invalid mu points: 214
 
 4. Summary statistics
-- beta_raw: count=1140, mean=0.109668, std=0.053946, min=0.015497, p05=0.047284, p25=0.072677, p50=0.096317, p75=0.138200, p95=0.208659, max=0.600157
-- beta_smoothed: count=1140, mean=0.110736, std=0.055051, min=0.031954, p05=0.051986, p25=0.073504, p50=0.097476, p75=0.137221, p95=0.204602, max=0.600157
-- mu_raw: count=1059, mean=0.000566, std=0.000658, min=0.000045, p05=0.000065, p25=0.000135, p50=0.000317, p75=0.000677, p95=0.002174, max=0.002996
-- mu_smoothed: count=1059, mean=0.000572, std=0.000659, min=0.000050, p05=0.000066, p25=0.000134, p50=0.000319, p75=0.000702, p95=0.002183, max=0.002919
-- R_eff_proxy_raw: count=1059, mean=1.020294, std=0.376602, min=0.127442, p05=0.470745, p25=0.766281, p50=0.989270, p75=1.247636, p95=1.670705, max=2.702595
-- R_eff_proxy_smoothed: count=1059, mean=1.020020, std=0.349372, min=0.361071, p05=0.509891, p25=0.734265, p50=0.993825, p75=1.267970, p95=1.580067, max=2.258428
+- beta_raw: count=1141, mean=0.111277, std=0.082532, min=0.017057, p05=0.049739, p25=0.073417, p50=0.096179, p75=0.138167, p95=0.206802, max=2.205966
+- beta_smoothed: count=1141, mean=0.114724, std=0.100255, min=0.034600, p05=0.053909, p25=0.074408, p50=0.096983, p75=0.136601, p95=0.199465, max=2.205966
+- mu_raw: count=1060, mean=0.000563, std=0.000654, min=0.000047, p05=0.000068, p25=0.000137, p50=0.000323, p75=0.000655, p95=0.002070, max=0.003121
+- mu_smoothed: count=1060, mean=0.000568, std=0.000655, min=0.000051, p05=0.000067, p25=0.000134, p50=0.000323, p75=0.000665, p95=0.002051, max=0.003022
+- R_eff_proxy_raw: count=1060, mean=1.017827, std=0.358561, min=0.135175, p05=0.487227, p25=0.786679, p50=0.986952, p75=1.226813, p95=1.648879, max=2.903544
+- R_eff_proxy_smoothed: count=1060, mean=1.017175, std=0.326015, min=0.393529, p05=0.543288, p25=0.750954, p50=0.988649, p75=1.246667, p95=1.537571, max=2.225141
 
 5. Methodological caveats
 - Reconstructed compartments are proxies, not directly observed states.

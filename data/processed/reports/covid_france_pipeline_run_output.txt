@@ -1,6 +1,6 @@
 COVID Pipeline Run Output
 ========================================
-Run timestamp: 2026-03-25T16:31:46
+Run timestamp: 2026-03-26T18:09:48
 Country: France
 
 Run summary
@@ -10,8 +10,6 @@ Run summary
 - Processed columns: 16
 - Processed parquet: data/processed/covid_france.parquet
 - Figures directory: outputs/figures
-- Analysis daily dataset: data/processed/analysis/covid_france_analysis_daily.parquet
-- Analysis weekly dataset: data/processed/analysis/covid_france_analysis_weekly.parquet
 - SEIRD prepared dataset: data/processed/covid_france_seird_ready.parquet
 - SEIRD parameter dataset: data/processed/covid_france_seird_parameters.parquet
 
@@ -20,13 +18,6 @@ Diagnostics artifacts
 - Coverage CSV: data/processed/reports/covid_france_coverage_summary.csv
 - Cleaning impact CSV: data/processed/reports/covid_france_cleaning_impact_summary.csv
 - Missing dates CSV: data/processed/reports/covid_france_missing_dates.csv
-- Study-window report: data/processed/reports/covid_france_study_window_report.txt
-- Study-window segments CSV: data/processed/reports/covid_france_study_window_segments.csv
-- Study-window coverage CSV: data/processed/reports/covid_france_study_window_daily_coverage.csv
-- Study-window plot: outputs/figures/analysis/covid_france_study_window_selection.png
-- Missingness heatmap: outputs/figures/analysis/covid_france_missingness_heatmap.png
-- Daily vs weekly plot: outputs/figures/analysis/covid_france_daily_vs_weekly_cases.png
-- Normalized trends plot: outputs/figures/analysis/covid_france_normalized_trends.png
 - SEIRD preparation report: data/processed/reports/seird/covid_france_seird_preparation_report.txt
 - SEIRD parameter report: data/processed/reports/seird/covid_france_seird_parameter_report.txt
 - SEIRD states plot: outputs/figures/seird/covid_france_seird_states.png
@@ -35,6 +26,13 @@ Diagnostics artifacts
 - SEIRD consistency plot: outputs/figures/seird/covid_france_seird_consistency.png
 - SEIRD R_eff proxy plot: outputs/figures/seird/covid_france_seird_reff_proxy.png
 - SEIRD summary plot: outputs/figures/seird/covid_france_seird_parameter_summary.png
+- SEIRD observed vs reconstructed cases plot: outputs/figures/seird/covid_france_seird_observed_vs_reconstructed_cases.png
+- SEIRD observed vs reconstructed deaths plot: outputs/figures/seird/covid_france_seird_observed_vs_reconstructed_deaths.png
+- SEIRD cases residual histogram: outputs/figures/seird/covid_france_seird_cases_residual_histogram.png
+- SEIRD deaths residual histogram: outputs/figures/seird/covid_france_seird_deaths_residual_histogram.png
+- SEIRD profile weights plot: outputs/figures/seird/covid_france_seird_profiles.png
+- SEIRD I reconstruction comparison plot: outputs/figures/seird/covid_france_seird_i_reconstruction_comparison.png
+- SEIRD E reconstruction comparison plot: outputs/figures/seird/covid_france_seird_e_reconstruction_comparison.png
 
 Temporal Validation Report
 ----------------------------------------
@@ -160,36 +158,6 @@ hosp_patients            1109.0  1.746367e+04  7.955913e+03      2972.0  1.05180
 new_cases_7d_avg         1280.0  3.046679e+04  5.351217e+04         0.0  3.468571e+03  1.270686e+04  3.184071e+04  3.452919e+05
 new_deaths_7d_avg        1280.0  1.312383e+02  1.610442e+02         0.0  2.571429e+01  6.500000e+01  1.652857e+02  8.002857e+02
 
-Study Window Report
-----------------------------------------
-COVID Study Window and Analysis Preparation Report
-======================================================
-
-1. Selected study window
-- Country: France
-- Base flow-bounded range: 2020-01-05 -> 2023-07-01
-- Selected window: 2020-01-05 -> 2023-07-01
-- Selected days: 1274
-- Selection reason: Selected longest contiguous segment meeting coverage threshold
-- Min row coverage threshold: 0.5
-- Min window days target: 180
-
-2. Coverage summary (selected window)
-- Mean row coverage: 0.904
-- Median row coverage: 1.000
-- Min row coverage: 0.556
-- Max row coverage: 1.000
-
-3. Candidate contiguous segments
-start_date   end_date  length_days
-2020-01-05 2023-07-01         1274
-
-4. Output datasets
-- Daily rows (selected window): 1274
-- Weekly rows: 183
-- Added normalized columns: 12
-
-
 SEIRD Preparation Report
 ----------------------------------------
 SEIRD Preparation Report
@@ -216,15 +184,21 @@ SEIRD Preparation Report
   },
   "assumptions": [
     "Population N is approximately constant on selected window",
-    "I_estimated is proxied by rolling incidence over infectious period",
-    "E_estimated is proxied by lagged rolling incidence over latent period",
+    "I_estimated is reconstructed by convolving observed cases with an infectivity profile",
+    "E_estimated is reconstructed by convolving observed cases with a latent profile",
     "D_estimated uses total_deaths when available, otherwise cumulative smoothed deaths",
     "R_estimated is inferred from cumulative infections minus E, I, D",
     "S_estimated is residual compartment: N - E - I - R - D"
   ],
   "reconstruction_hyperparameters": {
     "latent_period_days": 5,
-    "infectious_period_days": 14
+    "infectious_period_days": 14,
+    "infectivity_profile": "gamma",
+    "infectivity_shape": 3.0,
+    "infectivity_scale": 2.0,
+    "latent_profile": "uniform",
+    "latent_shape": 2.0,
+    "latent_scale": 2.0
   }
 }
 
@@ -234,16 +208,31 @@ SEIRD Preparation Report
 - start_date: 2020-01-05
 - end_date: 2023-07-01
 - cases_signal: new_cases_7d_avg
+- observed_cases_signal_column: observed_cases_signal
 - deaths_signal: new_deaths_7d_avg
 - latent_period_days: 5
 - infectious_period_days: 14
+- infectivity_profile: gamma
+- latent_profile: uniform
+- infectivity_weight_sum: 1.0000000000000002
+- latent_weight_sum: 1.0
+- observed_cases_min: 0.0
+- observed_cases_max: 345291.85714285716
+- i_old_peak_date: 2022-02-05
+- i_old_peak_value: 4746417.0
+- i_new_peak_date: 2022-02-02
+- i_new_peak_value: 4717781.722898643
+- i_old_new_correlation: 0.996489909513493
+- cases_vs_sigma_e_correlation: 0.9903432695528891
 - initial_states: {'date': '2020-01-05', 'N': 67813000.0, 'S0': 67813000.0, 'E0': 0.0, 'I0': 0.0, 'R0': 0.0, 'D0': 0.0}
 
 3. Reconstruction variable definitions
-- I_estimated: rolling sum of incidence signal over infectious_period_days
-- E_estimated: lagged rolling sum of incidence signal over latent_period_days
+- observed_cases_signal: baseline observed incidence (new_cases_7d_avg or configured signal)
+- I_estimated: observed_cases_signal convolved with infectivity profile weights
+- E_estimated: observed_cases_signal convolved with latent profile weights
+- I_estimated_old / E_estimated_old: previous rolling-sum proxies kept for diagnostics
 - D_estimated: total_deaths if available else cumulative smoothed deaths signal
-- R_estimated: cumulative infections - I_estimated - E_estimated - D_estimated
+- R_estimated: cumulative observed infections - I_estimated - E_estimated - D_estimated
 - S_estimated: N - E_estimated - I_estimated - R_estimated - D_estimated
 
 
@@ -274,22 +263,22 @@ SEIRD Parameter Estimation Report
 - population_column: population
 
 3. Validity diagnostics
-- valid beta points: 1140
-- invalid beta points: 134
-- valid mu points: 1127
-- invalid mu points: 147
+- valid beta points: 1141
+- invalid beta points: 133
+- valid mu points: 1060
+- invalid mu points: 214
 
 4. Summary statistics
-- beta_raw: count=1140, mean=0.109668, std=0.053946, min=0.015497, p05=0.047284, p25=0.072677, p50=0.096317, p75=0.138200, p95=0.208659, max=0.600157
-- beta_smoothed: count=1140, mean=0.110736, std=0.055051, min=0.031954, p05=0.051986, p25=0.073504, p50=0.097476, p75=0.137221, p95=0.204602, max=0.600157
-- mu_raw: count=1127, mean=0.003195, std=0.072993, min=0.000000, p05=0.000000, p25=0.000000, p50=0.000000, p75=0.000294, p95=0.004349, max=2.435007
-- mu_smoothed: count=1127, mean=0.006637, std=0.089198, min=0.000048, p05=0.000066, p25=0.000138, p50=0.000329, p75=0.000891, p95=0.002864, max=2.435007
-- R_eff_proxy_raw: count=1127, mean=1.020915, std=0.377674, min=0.040953, p05=0.473144, p25=0.769329, p50=0.979689, p75=1.246219, p95=1.695184, max=2.727764
-- R_eff_proxy_smoothed: count=1127, mean=1.013189, std=0.352071, min=0.097029, p05=0.485368, p25=0.734606, p50=0.991224, p75=1.264186, p95=1.569499, max=2.253217
+- beta_raw: count=1141, mean=0.111277, std=0.082532, min=0.017057, p05=0.049739, p25=0.073417, p50=0.096179, p75=0.138167, p95=0.206802, max=2.205966
+- beta_smoothed: count=1141, mean=0.114724, std=0.100255, min=0.034600, p05=0.053909, p25=0.074408, p50=0.096983, p75=0.136601, p95=0.199465, max=2.205966
+- mu_raw: count=1060, mean=0.000563, std=0.000654, min=0.000047, p05=0.000068, p25=0.000137, p50=0.000323, p75=0.000655, p95=0.002070, max=0.003121
+- mu_smoothed: count=1060, mean=0.000568, std=0.000655, min=0.000051, p05=0.000067, p25=0.000134, p50=0.000323, p75=0.000665, p95=0.002051, max=0.003022
+- R_eff_proxy_raw: count=1060, mean=1.017827, std=0.358561, min=0.135175, p05=0.487227, p25=0.786679, p50=0.986952, p75=1.226813, p95=1.648879, max=2.903544
+- R_eff_proxy_smoothed: count=1060, mean=1.017175, std=0.326015, min=0.393529, p05=0.543288, p25=0.750954, p50=0.988649, p75=1.246667, p95=1.537571, max=2.225141
 
 5. Methodological caveats
 - Reconstructed compartments are proxies, not directly observed states.
-- mu(t) is estimated with delayed infected states: dD/dt divided by I(t - death_delay_days).
+- mu(t) is estimated with rolling integrated method over window=7: ΔD / ΣI_lagged.
 - Deaths are lagging indicators and still affect mu(t) stability.
 - Parameter estimates may be unstable when E or I are small.
 

@@ -1,0 +1,50 @@
+SEIRDV Parameter Estimation Report
+=====================================
+
+1. Dataset overview
+- country: France
+- start_date: 2020-01-05
+- end_date: 2023-07-01
+- rows: 1274
+
+2. Estimation configuration
+- latent_period_days: 5
+- infectious_period_days: 14
+- death_delay_days: 14
+- vaccine_efficacy: 0.6000
+- sigma: 0.20000000
+- gamma: 0.07142857
+- derivative_method: gradient
+- derivative_pre_smoothing_window: 1
+- smoothing_window: 7
+- epsilon: 1e-08
+- min_infected_threshold: 10.0
+- min_exposed_threshold: 10.0
+- min_denominator_effective_term: 1.0
+- population_column: population
+- beta robust exclusion method: median + MAD (k=8.0, stability_window=14)
+- beta exclusion start date: 2020-05-29
+- beta robust threshold (median + k*MAD): 0.6618996816703868
+- beta median: 0.14811321855956044
+- beta MAD: 0.06422330788885329
+
+3. Validity diagnostics
+- valid beta points: 1129
+- invalid beta points: 145
+- valid mu points: 1060
+- invalid mu points: 214
+
+4. Summary statistics
+- beta_raw: count=1129, mean=0.159059, std=0.085599, min=0.020693, p05=0.056945, p25=0.083947, p50=0.140578, p75=0.218582, p95=0.320499, max=0.410875
+- beta_smoothed: count=1129, mean=0.158839, std=0.082085, min=0.037366, p05=0.060262, p25=0.088155, p50=0.146917, p75=0.218406, p95=0.311616, max=0.362677
+- mu_raw: count=1060, mean=0.000563, std=0.000654, min=0.000047, p05=0.000068, p25=0.000137, p50=0.000323, p75=0.000655, p95=0.002070, max=0.003121
+- mu_smoothed: count=1060, mean=0.000568, std=0.000655, min=0.000051, p05=0.000067, p25=0.000134, p50=0.000323, p75=0.000665, p95=0.002051, max=0.003022
+- R_eff_proxy_raw: count=1060, mean=1.017827, std=0.358561, min=0.135175, p05=0.487227, p25=0.786679, p50=0.986952, p75=1.226813, p95=1.648879, max=2.903544
+- R_eff_proxy_smoothed: count=1060, mean=1.015969, std=0.323977, min=0.394123, p05=0.540100, p25=0.754521, p50=0.987845, p75=1.246908, p95=1.538508, max=2.193621
+
+5. Methodological caveats
+- V_estimated is directly observation-driven from vaccination stock columns.
+- vaccine_efficacy is fixed, not inferred from data in this stage.
+- Reconstructed compartments are proxies, not directly observed states.
+- mu(t) uses rolling integrated estimation over window=7 with median+MAD exclusion.
+- Effective parameters should be interpreted as model-consistent proxies.

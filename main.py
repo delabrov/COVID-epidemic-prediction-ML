@@ -150,6 +150,15 @@ def save_pipeline_terminal_output_report(
             "- SEIRD deaths residual histogram: "
             f"{seird_plots_result.get('deaths_residual_histogram_plot_path')}"
         )
+        lines.append(f"- SEIRD profile weights plot: {seird_plots_result.get('profiles_plot_path')}")
+        lines.append(
+            "- SEIRD I reconstruction comparison plot: "
+            f"{seird_plots_result.get('i_reconstruction_comparison_plot_path')}"
+        )
+        lines.append(
+            "- SEIRD E reconstruction comparison plot: "
+            f"{seird_plots_result.get('e_reconstruction_comparison_plot_path')}"
+        )
     lines.append("")
     lines.append("Temporal Validation Report")
     lines.append("-" * 40)
@@ -454,6 +463,24 @@ def parse_args() -> argparse.Namespace:
         help="Latent period assumption for SEIRD sigma = 1/latent_period_days",
     )
     parser.add_argument(
+        "--seird-infectivity-profile",
+        type=str,
+        choices=["uniform", "gamma"],
+        default="gamma",
+        help="SEIRD infectivity profile used for I_estimated convolution",
+    )
+    parser.add_argument("--seird-infectivity-shape", type=float, default=3.0)
+    parser.add_argument("--seird-infectivity-scale", type=float, default=2.0)
+    parser.add_argument(
+        "--seird-latent-profile",
+        type=str,
+        choices=["uniform", "gamma"],
+        default="uniform",
+        help="SEIRD latent profile used for E_estimated convolution",
+    )
+    parser.add_argument("--seird-latent-shape", type=float, default=2.0)
+    parser.add_argument("--seird-latent-scale", type=float, default=2.0)
+    parser.add_argument(
         "--seird-death-delay-days",
         "--death-delay-days",
         dest="seird_death_delay_days",
@@ -617,6 +644,12 @@ def run_pipeline(args: argparse.Namespace) -> Path:
             population_column=args.seird_population_column,
             latent_period_days=args.latent_period_days,
             infectious_period_days=args.infectious_period_days,
+            infectivity_profile=args.seird_infectivity_profile,
+            infectivity_shape=args.seird_infectivity_shape,
+            infectivity_scale=args.seird_infectivity_scale,
+            latent_profile=args.seird_latent_profile,
+            latent_shape=args.seird_latent_shape,
+            latent_scale=args.seird_latent_scale,
             save_csv=args.seird_save_csv,
         )
 

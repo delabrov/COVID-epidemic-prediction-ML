@@ -1,5 +1,5 @@
-SEIRD Preparation Report
-============================
+SEIRDV Preparation Report
+=============================
 
 1. Framework definition
 {
@@ -9,28 +9,33 @@ SEIRD Preparation Report
     "end_date": "2023-07-01",
     "time_step": "1 day"
   },
-  "seird_equations": {
-    "dS_dt": "-beta * S * I / N",
-    "dE_dt": "beta * S * I / N - sigma * E",
-    "dI_dt": "sigma * E - gamma * I - mu * I",
-    "dR_dt": "gamma * I",
-    "dD_dt": "mu * I"
+  "seirdv_equations": {
+    "dS_dt": "-beta*S*I/N - nu*S",
+    "dV_dt": "nu*S - (1-epsilon_v)*beta*V*I/N",
+    "dE_dt": "beta*S*I/N + (1-epsilon_v)*beta*V*I/N - sigma*E",
+    "dI_dt": "sigma*E - gamma*I - mu*I",
+    "dR_dt": "gamma*I",
+    "dD_dt": "mu*I"
   },
   "observation_mapping": {
     "incidence_signal": "new_cases_7d_avg",
-    "mortality_signal": "new_deaths_7d_avg"
+    "mortality_signal": "new_deaths_7d_avg",
+    "vaccination_stock_signal": "people_fully_vaccinated (fallback: people_vaccinated)"
   },
   "assumptions": [
     "Population N is approximately constant on selected window",
+    "Vaccination compartment V is directly observation-driven from vaccination stock columns",
+    "Vaccine efficacy epsilon_v is fixed as a model hyperparameter (not inferred)",
     "I_estimated is reconstructed by convolving observed cases with an infectivity profile",
     "E_estimated is reconstructed by convolving observed cases with a latent profile",
     "D_estimated uses total_deaths when available, otherwise cumulative smoothed deaths",
     "R_estimated is inferred from cumulative infections minus E, I, D",
-    "S_estimated is residual compartment: N - E - I - R - D"
+    "S_estimated is residual compartment: N - V - E - I - R - D"
   ],
   "reconstruction_hyperparameters": {
     "latent_period_days": 5,
     "infectious_period_days": 14,
+    "vaccine_efficacy": 0.6,
     "infectivity_profile": "gamma",
     "infectivity_shape": 3.0,
     "infectivity_scale": 2.0,
@@ -46,8 +51,8 @@ SEIRD Preparation Report
 - start_date: 2020-01-05
 - end_date: 2023-07-01
 - cases_signal: new_cases_7d_avg
-- observed_cases_signal_column: observed_cases_signal
 - deaths_signal: new_deaths_7d_avg
+- vaccination_column_used: people_fully_vaccinated
 - latent_period_days: 5
 - infectious_period_days: 14
 - infectivity_profile: gamma
@@ -56,19 +61,25 @@ SEIRD Preparation Report
 - latent_weight_sum: 1.0
 - observed_cases_min: 0.0
 - observed_cases_max: 345291.85714285716
+- vaccinated_min: 1.0
+- vaccinated_max: 53192184.0
+- nu_flow_max: 540805.0
+- overflow_clipped_count: 518
+- s_negative_clipped_count: 230
 - i_old_peak_date: 2022-02-05
 - i_old_peak_value: 4746417.0
 - i_new_peak_date: 2022-02-02
 - i_new_peak_value: 4717781.722898643
 - i_old_new_correlation: 0.996489909513493
 - cases_vs_sigma_e_correlation: 0.9903432695528891
-- initial_states: {'date': '2020-01-05', 'N': 67813000.0, 'S0': 67813000.0, 'E0': 0.0, 'I0': 0.0, 'R0': 0.0, 'D0': 0.0}
+- initial_states: {'date': '2020-01-05', 'N': 67813000.0, 'S0': 67812999.0, 'V0': 1.0, 'E0': 0.0, 'I0': 0.0, 'R0': 0.0, 'D0': 0.0}
 
 3. Reconstruction variable definitions
 - observed_cases_signal: baseline observed incidence (new_cases_7d_avg or configured signal)
+- V_estimated: vaccination stock from people_fully_vaccinated (fallback: people_vaccinated)
+- nu_flow_raw / nu_flow_smoothed: daily vaccination flow estimated from V_estimated differences
 - I_estimated: observed_cases_signal convolved with infectivity profile weights
 - E_estimated: observed_cases_signal convolved with latent profile weights
-- I_estimated_old / E_estimated_old: previous rolling-sum proxies kept for diagnostics
 - D_estimated: total_deaths if available else cumulative smoothed deaths signal
-- R_estimated: cumulative observed infections - I_estimated - E_estimated - D_estimated
-- S_estimated: N - E_estimated - I_estimated - R_estimated - D_estimated
+- R_estimated: cumulative observed infections - E_estimated - I_estimated - D_estimated
+- S_estimated: N - V_estimated - E_estimated - I_estimated - R_estimated - D_estimated
