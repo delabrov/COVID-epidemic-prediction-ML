@@ -177,20 +177,8 @@ def plot_seirdv_beta(df: pd.DataFrame, output_path: Path, country: str) -> Path:
                 df.index.min(),
                 valid_start,
                 alpha=0.3,
-                color="red",
+                color="gray",
                 label="Excluded unstable region",
-            )
-            y_min, y_max = axis.get_ylim()
-            y_text = y_max - 0.08 * (y_max - y_min)
-            midpoint = df.index.min() + (valid_start - df.index.min()) / 2
-            axis.text(
-                midpoint,
-                y_text,
-                "Initial unstable phase\n(beta not reliable)",
-                color="red",
-                ha="center",
-                va="top",
-                fontsize=9,
             )
     axis.axhline(0.0, linestyle="--", linewidth=1.0)
     axis.set_title(f"Estimated SEIRDV beta(t) - {country}")
@@ -215,7 +203,7 @@ def plot_seirdv_mu(df: pd.DataFrame, output_path: Path, country: str) -> Path:
                 df.index.min(),
                 valid_start,
                 alpha=0.3,
-                color="red",
+                color="gray",
                 label="Excluded unstable region",
             )
 
