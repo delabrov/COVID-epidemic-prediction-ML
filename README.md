@@ -1,68 +1,34 @@
-# COVID Epidemiological Data Pipeline
+# Modélisation COVID-19 en France (SIR / SEIRD / SEIRDV)
 
-Clean and modular Python pipeline for epidemiological analysis with OWID data.
+Ce projet propose un pipeline de modélisation épidémiologique du COVID-19 en France, basé sur des modèles compartimentaux et des séries temporelles journalières lissées.
 
-## Project Structure
+L’objectif est de :
+- reconstruire les compartiments latents \(S, E, I, R, D, V\) à partir des données observées,
+- estimer des paramètres dynamiques dépendants du temps (notamment \(\beta(t)\), \(\mu(t)\), \(R_{\mathrm{eff}}(t)\)),
+- analyser l’évolution de la dynamique épidémique et l’impact de la vaccination.
 
-```text
-.
-├── data/
-│   ├── raw/
-│   └── processed/
-├── outputs/
-│   └── figures/
-├── src/
-│   ├── data/
-│   │   ├── download_data.py
-│   │   └── preprocess_data.py
-│   └── visualization/
-│       └── plot_data.py
-└── main.py
-```
+Les principales données utilisées incluent :
+- `new_cases_7d_avg`
+- `new_deaths_7d_avg`
+- `people_fully_vaccinated` (ou `people_vaccinated` en fallback)
+- `population`
 
-## What It Does
+## Documentation scientifique
 
-1. Download OWID COVID-19 dataset.
-2. Preprocess one country time series for analysis.
-3. Save cleaned dataset in parquet (and optional CSV).
-4. Generate exploratory figures.
+La documentation complète du modèle SEIRDV (équations, reconstruction des états, estimation des paramètres, hypothèses, limites, résultats et discussion scientifique) est disponible ici :
 
-No machine learning is included at this stage.
+- [Documentation détaillée SEIRDV](docs/seirdv_model_documentation.md)
 
-## Install
+## Exécution rapide
+
+Installer les dépendances :
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-## Run Full Pipeline
+Lancer le pipeline principal :
 
 ```bash
 python main.py --country France
-```
-
-Optional flags:
-
-```bash
-python main.py --country France --force-download --save-csv
-```
-
-## Run Each Step Separately
-
-Download:
-
-```bash
-python -m src.data.download_data
-```
-
-Preprocess:
-
-```bash
-python -m src.data.preprocess_data --country France --save-csv
-```
-
-Plot:
-
-```bash
-python -m src.visualization.plot_data --input-path data/processed/covid_france.parquet --country France
 ```
