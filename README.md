@@ -7,18 +7,9 @@ L’objectif est de :
 2) estimer les paramètres dépendants du temps (notamment \(\beta(t)\), \(\mu(t)\), \(R_{\mathrm{eff}}(t)\)),
 3) analyser l’évolution de la dynamique épidémique et l’impact de la vaccination.
 
-Les principales données utilisées incluent :
-- `new_cases_7d_avg`
-- `new_deaths_7d_avg`
-- `people_fully_vaccinated` (ou `people_vaccinated` en fallback)
-- `population`
+## Données utilisées
 
-## Données utilisées et provenance
-
-Les données proviennent du jeu de données **Our World in Data (OWID) COVID-19**, téléchargé automatiquement par le pipeline depuis :
-
-- `https://covid.ourworldindata.org/data/owid-covid-data.csv`
-- URL de secours : `https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/owid-covid-data.csv`
+Les données proviennent du jeu de données **Our World in Data (OWID) COVID-19**, téléchargé depuis `https://covid.ourworldindata.org/data/owid-covid-data.csv`
 
 Le pipeline filtre ensuite le pays d’intérêt (France par défaut), applique des règles de nettoyage, puis construit des signaux lissés sur 7 jours pour limiter les effets de reporting hebdomadaire.
 
@@ -76,6 +67,4 @@ Cette expression permet de relier la transmission, la dynamique de sortie des in
 
 ## Documentation complète
 
-La documentation scientifique détaillée du modèle (reconstruction des états, estimation paramétrique, hypothèses, limites et discussion) est disponible dans :
-
-- [docs/seirdv_model_documentation.md](docs/seirdv_model_documentation.md)
+La documentation détaillée du modèle (reconstruction des états, estimation paramétrique, hypothèses, limites et discussion) est disponible dans : [docs/seirdv_model_documentation.md](docs/seirdv_model_documentation.md)
