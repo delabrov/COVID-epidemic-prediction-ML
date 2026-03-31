@@ -2,82 +2,102 @@
 
 ## 1. Introduction
 
-La pandémie de COVID-19 a mis en évidence la nécessité de disposer d’outils capables de relier des observations (cas confirmés, décès rapportés, couverture vaccinale) à des mécanismes dynamiques sous-jacents de transmission. Les modèles compartimentaux constituent un cadre particulièrement adapté à cet objectif, parce qu'ils permettent de représenter explicitement les flux entre états épidémiologiques et d’interpréter les paramètres estimés en termes biologiques et populationnels.
+La pandémie de COVID-19 a mis en évidence la nécessité de disposer d’outils capables de relier des observations (cas confirmés, décès rapportés, couverture vaccinale) à des mécanismes dynamiques de transmission. Les modèles compartimentaux sont adaptés à cet objectif, car ils représentent explicitement les flux entre états épidémiologiques et permettent d’interpréter les paramètres estimés.
 
-Dans ce projet, l’analyse est menée à l’échelle nationale (France) à partir de séries journalières lissées sur 7 jours, afin de réduire les effets de reporting hebdomadaire (rattrapages des détections chaque lundi). L’approche a progressé d’un cadre SIR vers un modèle SEIRDV intégrant explicitement la vaccination. L’ambition n’est pas seulement de produire un ajustement descriptif des données observées, mais de reconstruire les compartiments latents S, E, I, R, D, V, d’estimer des paramètres dépendants du temps beta(t), mu(t), et de caractériser leur évolution épidémiologique au cours du temps.
-
-L’objectif central du modèle SEIRDV est donc double. D’une part, il s’agit de fournir une reconstruction cohérente des états non observés à partir de signaux partiels et bruités. D’autre part, il s’agit d’obtenir des indicateurs dynamiques interprétables, notamment la transmissibilité effective et la létalité apparente des infections, en tenant compte de la réduction de susceptibilité induite par la vaccination.
+Dans ce projet, l’analyse est menée à l’échelle nationale (France) à partir de séries journalières lissées sur 7 jours pour atténuer les effets de reporting hebdomadaire. L’approche progresse d’un cadre SIR vers SEIRD, puis SEIRDV avec vaccination explicite. L’objectif est de reconstruire les compartiments latents `S, E, I, R, D, V`, d’estimer des paramètres dépendants du temps (`beta(t)`, `mu(t)`), puis d’analyser leur dynamique.
 
 ## 2. Description du modèle SEIRDV
 
-Le modèle SEIRDV considère six compartiments : les susceptibles (S), les exposés non encore infectieux (E), les infectieux (I), les retirés (R), les décès (D), et les vaccinés (V). La population totale (N) est supposée constante à l’échelle de temps étudiée, en négligeant migrations et variations démographiques lentes.
+Le modèle considère six compartiments : `S` (susceptibles), `E` (exposés non encore infectieux), `I` (infectieux), `R` (retirés/guéris), `D` (décès), `V` (vaccinés). La population totale `N` est supposée constante à l’échelle d’étude.
 
-Le système différentiel continu s’écrit :
+Le système dynamique est :
 
-dS/dt = -beta(t) x S I / N - nu(t) x S
+```text
+dS/dt = -beta(t) * S * I / N - nu(t) * S
+dV/dt =  nu(t) * S - (1 - epsilon_v) * beta(t) * V * I / N
+dE/dt =  beta(t) * S * I / N + (1 - epsilon_v) * beta(t) * V * I / N - sigma * E
+dI/dt =  sigma * E - gamma * I - mu(t) * I
+dR/dt =  gamma * I
+dD/dt =  mu(t) * I
+```
 
-dV/dt = nu(t) x S - (1-epsilon) x beta(t) x V I / N
-
-dE/dt = beta(t) x S I / N + (1-epsilon) x beta(t) x V I / N - sigma x E
-
-dI/dt = sigma x E - gamma x I - mu(t) x I
-
-dR/dt = gamma x I
-
-dD/dt = mu(t) x I
-
-Dans ce cadre, beta(t) représente l’intensité de transmission effective, sigma le taux de sortie du compartiment exposé (inverse de la période de latence), gamma le taux de guérison/sortie infectieuse (inverse de la période infectieuse), mu(t) le taux de décès associé à l’état infectieux, nu(t) le flux de vaccination, et varepsilon l’efficacité vaccinale contre l’infection (supposée constante dans la version actuelle).
-
-L’expression (1-epsilon) x beta x V I / N traduit le fait qu’un individu vacciné n’est pas nécessairement totalement protégé : sa contribution au risque d’infection est réduite d’un facteur (1-epsilon), mais reste positive si epsilon < 1.
+Ici, `epsilon_v` est l’efficacité vaccinale contre l’infection (constante dans la version actuelle). Le terme `(1 - epsilon_v)` modélise le risque résiduel d’infection chez les vaccinés.
 
 ## 3. Reconstruction des états
 
-La reconstruction des compartiments repose sur les séries observées \(`new_cases_7d_avg`, `new_deaths_7d_avg`, `people_fully_vaccinated`.
+Les séries utilisées sont `new_cases_7d_avg`, `new_deaths_7d_avg`, `people_fully_vaccinated` (fallback `people_vaccinated`) et `population`.
 
-Le compartiment exposé E(t) est estimé par convolution de l’incidence observée avec un noyau de latence uniforme. Cette opération redistribue les nouveaux cas détectés sur une fenêtre de latence, ce qui revient à approximer la mémoire du processus d’infection avant l’entrée en infectiosité. Le compartiment infectieux I(t) est reconstruit via une convolution avec un noyau gamma d’infectivité, mieux adapté qu’un noyau uniforme pour représenter une probabilité de présence infectieuse asymétrique dans le temps.
+`E(t)` est reconstruit par convolution de l’incidence avec un noyau de latence (uniforme dans la configuration standard). `I(t)` est reconstruit par convolution avec un profil d’infectivité (gamma dans la configuration standard). `D(t)` provient des décès observés (cumulés dans le pipeline d’estimation).
 
-Le compartiment des décès D(t) est obtenu à partir des décès observés (cumulés ou flux selon le pipeline), tandis que R(t) est reconstruit par bilan de masse à partir des infections cumulées, en retirant les contributions de E, I et D. Le compartiment susceptible est ensuite obtenu comme résidu :
+`R(t)` est reconstruit par bilan de masse à partir des infections cumulées, puis `S(t)` est obtenu par conservation :
 
+```text
 S(t) = N - E(t) - I(t) - R(t) - D(t)
+```
 
-Dans l’extension SEIRDV, V(t) provient directement des données vaccinales. Le flux nu(t) est estimé par dérivation numérique de V(t). Cette étape relie explicitement les données de couverture vaccinale à la dynamique des flux inter-compartimentaux.
-
-Cette reconstruction repose sur plusieurs hypothèses structurantes : homogénéité de mélange à l’échelle nationale, délais biologiques moyens stationnaires pour sigma et gamma, qualité suffisante du lissage 7 jours pour réduire le bruit de reporting, et interprétation de la vaccination par une réduction de susceptibilité moyenne unique epsilon.
+`V(t)` vient directement des données vaccinales, et `nu(t)` est approché par dérivation numérique de `V(t)`.
 
 ## 4. Estimation des paramètres
 
-L’estimation est effectuée point par point, puis stabilisée par lissage temporel. Les paramètres fixes sont :
+Les paramètres fixes sont :
 
+```text
 sigma = 1 / latent_period_days
 gamma = 1 / infectious_period_days
+```
 
-Le paramètre beta(t) est identifié à partir de l’équation de E. En notant Delta E_t une approximation de dE/dt par différence finie, on obtient :
+La dérivée `dE/dt` est estimée numériquement (gradient ou différence finie selon la configuration), puis :
 
-beta(t) ~ Delta E_t + sigma x E_t x (S_t + (1-epsilon) x V_t) x I_t / N
+```text
+beta(t) ~= [dE/dt + sigma * E_t] / [((S_t + (1 - epsilon_v) * V_t) * I_t) / N]
+```
 
-Cette forme montre que la vaccination agit via une population effectivement susceptible S_t + (1-epsilon) x V_t, et non via S_t seul.
+Cette forme est exactement celle implémentée dans `estimate_seirdv_parameters.py`.
 
-Le paramètre mu(t) est estimé à partir du flux de décès, en intégrant un délai moyen infection-décès \(`death_delay_days`\). Une approximation usuelle est :
+Pour `mu(t)`, le pipeline n’utilise pas un ratio point par point, mais une estimation intégrée glissante avec délai décès `tau_d` :
 
-mu(t) ~ \Delta D_t x I_{t - tau_d}
+```text
+I_lagged(t) = I(t - tau_d)
+mu(t) ~= Delta_D_window(t) / Sum_window(I_lagged)
+```
 
-avec tau_d\ le délai de décès et Delta D_t la différence finie des décès cumulés (ou directement les décès journaliers selon la convention du pipeline). Cette quantité doit être interprétée comme un proxy dynamique de létalité conditionnelle à l’état infectieux reconstruit, et non comme une IFR strictement démographique.
+avec :
 
-Le nombre de reproduction effectif est défini comme un proxy mécaniste :
+```text
+Delta_D_window(t) = D(t) - D(t - w)
+Sum_window(I_lagged) = somme des I_lagged sur les w derniers jours
+```
 
-R_eff(t) ~ beta(t) / gamma + mu(t) x (S_t + (1-epsilon) x V_t) / N
+Cette formulation est plus stable que `DeltaD / I_lagged` point par point.
 
-Les estimateurs bruts étant sensibles au bruit (dérivées numériques et divisions par des quantités parfois faibles), un lissage par moyenne glissante est appliqué aux séries paramétriques. Ce choix réduit la variance locale tout en préservant les tendances de moyen terme utiles à l’interprétation.
+Le proxy utilisé pour le nombre de reproduction effectif est :
 
-Les zones instables, en particulier en début de série lorsque les compartiments reconstruits sont fragiles, sont traitées par une méthode fondée sur la médiane et la MAD (Median Absolute Deviation). Concrètement, les valeurs aberrantes au-delà d’un seuil robuste autour de la médiane sont exclues de l’analyse ou neutralisées. Ce choix est justifié par la non-gaussianité fréquente des erreurs en contexte épidémiologique et par la sensibilité des ratios dynamiques aux petits dénominateurs.
+```text
+Reff(t) ~= [beta(t) / (gamma + mu(t))] * [S_t + (1 - epsilon_v) * V_t] / N
+```
+
+Les séries `beta` et `mu` sont ensuite lissées par moyenne glissante. Les périodes initiales instables sont gérées par une détection robuste fondée sur médiane + MAD.
+
+## 5. Résultats obtenus
+
+Le modèle produit un très bon ajustement sur les cas (`R2 ~= 0.98`) et un bon ajustement sur les décès (`R2 ~= 0.93`). Les erreurs (RMSE, MAE) restent compatibles avec une analyse de tendance.
+
+Les séries brutes de `beta(t)` et `mu(t)` sont volatiles, ce qui est attendu avec des dérivées et des ratios. Le lissage améliore fortement la lisibilité des régimes temporels. `Reff(t)` oscille autour du seuil 1, ce qui permet d’identifier les phases de croissance ou de décroissance.
 
 ## 6. Discussion scientifique
 
-La quantité \(\beta(t)\) doit être interprétée comme une transmissibilité effective agrégée, qui condense à la fois des facteurs biologiques (propriétés des variants), comportementaux (contacts, adhésion aux mesures), environnementaux et institutionnels. Ce paramètre n’est donc pas une constante intrinsèque du pathogène, mais un indicateur composite dépendant du contexte spatio-temporel.
+`beta(t)` est une transmissibilité effective agrégée : elle absorbe les effets comportementaux, les interventions, les caractéristiques des variants et des facteurs de contexte. `mu(t)` est un proxy dynamique de létalité conditionnelle aux infectieux reconstruits, pas une IFR démographique stricte.
 
-Le paramètre \(\mu(t)\) représente une intensité de mortalité conditionnelle à l’état infectieux reconstruit. Il capture simultanément la sévérité clinique moyenne, la structure des cas, la pression hospitalière et les délais de notification. Son interprétation doit rester prudente : une baisse de \(\mu(t)\) peut refléter une amélioration de la prise en charge, une modification de l’âge moyen des infectés, un effet de vaccination contre les formes graves, ou un mélange de ces mécanismes.
+L’introduction de `V` et `epsilon_v` améliore l’interprétation des phases post-vaccinales en modélisant une susceptibilité effective réduite. En revanche, l’hypothèse `epsilon_v` constante reste forte sur des périodes longues.
 
-L’intégration explicite de la vaccination est un apport majeur du modèle SEIRDV. En introduisant \(V\), \(\nu(t)\) et \(\varepsilon\), le modèle distingue mieux l’érosion du réservoir réellement susceptible de la dynamique infectieuse pure. Cette structure améliore l’interprétation de \(R_{\mathrm{eff}}\), notamment dans les périodes de forte montée de couverture vaccinale.
+## 7. Comparaison qualitative avec la littérature
 
-Les limites principales demeurent toutefois importantes. L’hypothèse \(\varepsilon\) constante est forte alors que l’efficacité varie selon le temps, les doses, les variants et l’échappement immunitaire. Le modèle reste agrégé sans stratification par âge, territoire ou statut immunitaire détaillé. Enfin, les dérivées numériques et ratios introduisent mécaniquement du bruit, même après lissage.
+Les ordres de grandeur observés sont cohérents avec les études compartimentales COVID : `beta` variable dans le temps, `Reff` évoluant autour de 1 selon les régimes, et `mu` plus élevé au début puis souvent décroissant avec l’amélioration de la prise en charge et l’immunisation.
 
+L’efficacité vaccinale contre l’infection est connue pour varier selon les variants, le temps depuis vaccination et les rappels. Une valeur constante est donc une approximation utile mais limitée.
+
+## 8. Perspectives
+
+Une extension naturelle consiste à introduire `epsilon_v(t)` dépendant du temps. D’autres axes : détection automatique de régimes (changepoints), stratification par âge, couplage spatial, et quantification d’incertitude (cadres bayésiens).
+
+Le modèle SEIRDV actuel constitue une base robuste, lisible et opérationnelle pour analyser la dynamique épidémique à partir de données agrégées nationales.

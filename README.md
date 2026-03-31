@@ -3,8 +3,8 @@
 Ce projet propose un pipeline de modélisation épidémiologique du COVID-19 en France, basé sur des modèles mathématiques compartimentaux et des séries temporelles journalières lissées disponibles sur internet.
 
 L’objectif est de : 
-1) reconstruire les compartiments \(S, E, I, R, D, V\) à partir des données observées,
-2) estimer les paramètres dépendants du temps (notamment \(\beta(t)\), \(\mu(t)\), \(R_{\mathrm{eff}}(t)\)),
+1) reconstruire les compartiments `S, E, I, R, D, V` à partir des données observées,
+2) estimer les paramètres dépendants du temps (notamment `beta(t)`, `mu(t)`, `Reff(t)`),
 3) analyser l’évolution de la dynamique épidémique et l’impact de la vaccination.
 
 ## Données utilisées
@@ -17,51 +17,41 @@ Les variables principales mobilisées pour la modélisation SEIRDV sont les suiv
 
 - `new_cases_7d_avg` : incidence journalière lissée sur 7 jours, utilisée pour reconstruire les flux d’infection.
 - `new_deaths_7d_avg` : mortalité journalière lissée sur 7 jours, utilisée pour reconstruire le flux vers le compartiment des décès.
-- `people_fully_vaccinated` (fallback `people_vaccinated`) : stock cumulé de vaccinés, utilisé pour construire \(V(t)\).
-- `population` : taille de la population \(N\), utilisée dans les termes d’interaction et les normalisations.
+- `people_fully_vaccinated` (fallback `people_vaccinated`) : stock cumulé de vaccinés, utilisé pour construire `V(t)`.
+- `population` : taille de la population `N`, utilisée dans les termes d’interaction et les normalisations.
 
 ## Modèle SEIRDV
 
 Le modèle SEIRDV étend SEIRD en ajoutant un compartiment de vaccination. Les compartiments sont :
-\(S\) (susceptibles), \(E\) (exposés), \(I\) (infectieux), \(R\) (retirés/guéris), \(D\) (décès), \(V\) (vaccinés).
+`S` (susceptibles), `E` (exposés), `I` (infectieux), `R` (retirés/guéris), `D` (décès), `V` (vaccinés).
 
 Le système dynamique continu est :
 
-\[
-\frac{dS}{dt} = -\beta(t)\frac{SI}{N} - \nu(t)S
-\]
-\[
-\frac{dV}{dt} = \nu(t)S - (1-\varepsilon)\beta(t)\frac{VI}{N}
-\]
-\[
-\frac{dE}{dt} = \beta(t)\frac{SI}{N} + (1-\varepsilon)\beta(t)\frac{VI}{N} - \sigma E
-\]
-\[
-\frac{dI}{dt} = \sigma E - \gamma I - \mu(t)I
-\]
-\[
-\frac{dR}{dt} = \gamma I
-\]
-\[
-\frac{dD}{dt} = \mu(t)I
-\]
+```text
+dS/dt = -beta(t) * S * I / N - nu(t) * S
+dV/dt =  nu(t) * S - (1 - epsilon) * beta(t) * V * I / N
+dE/dt =  beta(t) * S * I / N + (1 - epsilon) * beta(t) * V * I / N - sigma * E
+dI/dt =  sigma * E - gamma * I - mu(t) * I
+dR/dt =  gamma * I
+dD/dt =  mu(t) * I
+```
 
 ## Paramètres et interprétation
 
 Les paramètres du modèle sont définis comme suit :
 
-- \(\beta(t)\) : taux de transmission effectif, dépendant du temps. Il agrège les effets de contact, comportements, mesures sanitaires et propriétés des variants.
-- \(\sigma\) : taux de progression \(E \rightarrow I\), généralement fixé à \(1/\text{latent\_period\_days}\).
-- \(\gamma\) : taux de sortie \(I \rightarrow R\), généralement fixé à \(1/\text{infectious\_period\_days}\).
-- \(\mu(t)\) : taux de décès parmi les infectieux, estimé dynamiquement à partir des décès observés (avec délai).
-- \(\nu(t)\) : flux de vaccination, dérivé de \(V(t)\).
-- \(\varepsilon\) : efficacité vaccinale contre l’infection (constante dans la version actuelle). Le terme \((1-\varepsilon)\) traduit le risque résiduel d’infection chez les vaccinés.
+- `beta(t)` : taux de transmission effectif, dépendant du temps. Il agrège les effets de contact, comportements, mesures sanitaires et propriétés des variants.
+- `sigma` : taux de progression `E -> I`, généralement fixé à `1 / latent_period_days`.
+- `gamma` : taux de sortie `I -> R`, généralement fixé à `1 / infectious_period_days`.
+- `mu(t)` : taux de décès parmi les infectieux, estimé dynamiquement à partir des décès observés (avec délai).
+- `nu(t)` : flux de vaccination, dérivé de `V(t)`.
+- `epsilon` : efficacité vaccinale contre l’infection (constante dans la version actuelle). Le terme `(1 - epsilon)` traduit le risque résiduel d’infection chez les vaccinés.
 
 Un proxy du nombre de reproduction effectif est utilisé :
 
-\[
-R_{\mathrm{eff}}(t) \approx \frac{\beta(t)}{\gamma + \mu(t)} \times \frac{S(t) + (1-\varepsilon)V(t)}{N}
-\]
+```text
+Reff(t) ~= [beta(t) / (gamma + mu(t))] * [S(t) + (1 - epsilon) * V(t)] / N
+```
 
 Cette expression permet de relier la transmission, la dynamique de sortie des infectieux et la réduction du réservoir effectivement susceptible via la vaccination.
 

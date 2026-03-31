@@ -1,111 +1,80 @@
-# SEIRD Model Documentation (v1)
+# Documentation du modèle SEIRD (v1)
 
 ## Introduction
 
-Le modèle SEIRD est une extension du modèle épidémiologique classique SIR, conçue pour représenter de manière plus réaliste la dynamique de propagation d’une maladie infectieuse en intégrant explicitement les phases d’incubation et les décès. Il repose sur une décomposition de la population totale \( N \), supposée constante à l’échelle temporelle considérée, en cinq compartiments dynamiques : les individus susceptibles \( S(t) \), les individus exposés mais non encore infectieux \( E(t) \), les individus infectieux \( I(t) \), les individus retirés (guéris ou immunisés) \( R(t) \), et les individus décédés \( D(t) \).
-
----
+Le modèle SEIRD est une extension du modèle SIR pour représenter plus finement la dynamique d’une maladie infectieuse. La population totale `N` (supposée constante à l’échelle étudiée) est répartie en cinq compartiments : `S(t)` (susceptibles), `E(t)` (exposés non encore infectieux), `I(t)` (infectieux), `R(t)` (retirés/guéris) et `D(t)` (décès).
 
 ## Équations du modèle
 
-Le système dynamique est régi par les équations différentielles suivantes :
+Le système dynamique est :
 
-\[
-\frac{dS}{dt} = -\beta(t) \frac{S(t) I(t)}{N}
-\]
+```text
+dS/dt = -beta(t) * S * I / N
+dE/dt =  beta(t) * S * I / N - sigma * E
+dI/dt =  sigma * E - gamma * I - mu(t) * I
+dR/dt =  gamma * I
+dD/dt =  mu(t) * I
+```
 
-\[
-\frac{dE}{dt} = \beta(t) \frac{S(t) I(t)}{N} - \sigma E(t)
-\]
-
-\[
-\frac{dI}{dt} = \sigma E(t) - \gamma I(t) - \mu(t) I(t)
-\]
-
-\[
-\frac{dR}{dt} = \gamma I(t)
-\]
-
-\[
-\frac{dD}{dt} = \mu(t) I(t)
-\]
-
-Dans ce cadre, le paramètre \( \beta(t) \) représente le taux de transmission, c’est-à-dire le nombre moyen de contacts infectieux par unité de temps, et peut varier au cours du temps pour refléter les changements de comportement, les politiques sanitaires ou l’émergence de nouveaux variants.
-
-Le paramètre \( \sigma \) correspond à l’inverse de la durée moyenne d’incubation, définissant la vitesse de passage du compartiment exposé au compartiment infectieux. Le paramètre \( \gamma \) représente le taux de guérison, soit l’inverse de la durée moyenne d’infectiosité. Enfin, \( \mu(t) \) correspond au taux de mortalité instantané parmi les individus infectieux, et peut également varier dans le temps.
-
----
+`beta(t)` est le taux de transmission effectif. `sigma` est le taux de passage `E -> I` (souvent `1 / latent_period_days`). `gamma` est le taux de sortie `I -> R` (souvent `1 / infectious_period_days`). `mu(t)` est un taux de décès associé aux infectieux.
 
 ## Construction du projet
 
-Le projet repose sur une approche inverse consistant non pas à simuler directement ces équations, mais à reconstruire les états du système à partir de données observées, puis à estimer les paramètres du modèle à partir de ces états.
+Le pipeline ne se limite pas à simuler les équations. Il reconstruit d’abord les états latents (`S, E, I, R, D`) à partir de données observées (cas, décès), puis estime les paramètres dynamiques.
 
-Les données utilisées sont principalement des séries temporelles de nouveaux cas et de nouveaux décès, lissées par moyenne mobile sur sept jours afin de réduire les effets de bruit et de reporting irrégulier.
-
----
+Les signaux observés sont lissés sur 7 jours pour réduire le bruit hebdomadaire de notification.
 
 ## Reconstruction des compartiments
 
-La reconstruction des compartiments repose sur plusieurs approximations structurantes.
+`I(t)` est reconstruit à partir des nouveaux cas via un profil d’infectivité (souvent gamma). `E(t)` est reconstruit via un profil de latence (souvent uniforme). `D(t)` provient des décès cumulés/observés selon le pipeline.
 
-Le nombre d’individus infectieux \( I(t) \) est approximé comme la somme glissante des nouveaux cas sur une fenêtre correspondant à la durée moyenne d’infectiosité. Cela revient à considérer que chaque individu reste infectieux pendant un nombre fixe de jours.
+`R(t)` est reconstruit par bilan de masse à partir des infections cumulées, puis :
 
-Le compartiment exposé \( E(t) \) est reconstruit de manière analogue, en utilisant une version décalée et cumulée des nouveaux cas, correspondant à la durée d’incubation.
-
-Le compartiment des décès \( D(t) \) est obtenu à partir des décès cumulés observés ou reconstruits.
-
-Le compartiment des retirés \( R(t) \) est estimé comme la différence entre les infections cumulées et les individus encore présents dans les compartiments \( E \), \( I \) et \( D \).
-
-Le compartiment des susceptibles \( S(t) \) est alors déduit par conservation de la population totale, selon la relation :
-
-\[
+```text
 S(t) = N - E(t) - I(t) - R(t) - D(t)
-\]
-
----
+```
 
 ## Estimation des paramètres
 
-L’estimation des paramètres repose sur l’inversion directe des équations différentielles.
+Les paramètres fixes sont :
 
-Le paramètre de transmission \( \beta(t) \) est obtenu en réarrangeant l’équation de \( dS/dt \), ce qui permet de l’exprimer en fonction de la dérivée de \( S(t) \), de \( S(t) \), de \( I(t) \) et de \( N \).
+```text
+sigma = 1 / latent_period_days
+gamma = 1 / infectious_period_days
+```
 
-Le paramètre de mortalité \( \mu(t) \) est estimé à partir de l’équation des décès, en reliant le flux de décès au nombre d’individus infectieux, avec prise en compte d’un délai entre infection et décès.
+Dans l’implémentation actuelle, `beta(t)` est estimé via l’équation de `E` (et non via `dS/dt`) :
 
-Afin de rendre cette estimation plus robuste, une approche intégrée est utilisée, consistant à lisser les flux de décès et à les comparer à une somme glissante du nombre d’infectés retardés. Cette méthode permet de réduire la sensibilité aux fluctuations locales et au bruit des données.
+```text
+beta(t) ~= [dE/dt + sigma * E_t] / [(S_t * I_t) / N]
+```
 
----
+`mu(t)` est estimé à partir des décès avec délai `tau_d`, sous forme intégrée glissante pour stabiliser le ratio :
+
+```text
+I_lagged(t) = I(t - tau_d)
+mu(t) ~= Delta_D_window(t) / Sum_window(I_lagged)
+```
+
+avec :
+
+```text
+Delta_D_window(t) = D(t) - D(t - w)
+Sum_window(I_lagged) = somme des I_lagged sur les w derniers jours
+```
+
+Cette forme est plus robuste qu’une division point par point.
 
 ## Hypothèses et approximations
 
-Plusieurs hypothèses importantes structurent ce modèle.
+Le modèle suppose un mélange homogène de la population, des durées moyennes de latence et d’infectiosité fixes, et une représentativité acceptable des données observées après lissage.
 
-La population est considérée comme homogène et bien mélangée, ce qui signifie que tous les individus ont la même probabilité d’entrer en contact les uns avec les autres.
-
-Les durées d’incubation et d’infectiosité sont supposées constantes, ce qui simplifie la dynamique mais ignore la variabilité individuelle.
-
-Les données observées sont supposées être proportionnelles aux flux réels, bien que l’on sache que le nombre de cas est généralement sous-estimé, en particulier au début de l’épidémie.
-
-Les délais entre infection et décès sont modélisés de manière déterministe, alors qu’ils sont en réalité distribués.
-
----
+Les paramètres estimés (`beta`, `mu`) doivent être lus comme des paramètres effectifs agrégés.
 
 ## Gestion des instabilités initiales
 
-Une difficulté majeure du modèle réside dans la qualité des données initiales, en particulier lors des premières phases de l’épidémie, où les cas sont fortement sous-déclarés et les décès peuvent être rapportés de manière irrégulière.
-
-Cela conduit à des estimations instables des paramètres, notamment du taux de mortalité \( \mu(t) \), lorsque le nombre d’infectés estimés est très faible.
-
-Afin de corriger cet effet, une procédure robuste d’exclusion de la phase initiale a été introduite, basée sur une détection automatique des valeurs aberrantes de \( \mu(t) \) à l’aide de statistiques robustes (médiane et écart absolu médian).
-
-Cette approche permet d’identifier et d’exclure la région temporelle où les estimations ne sont pas fiables, sans recourir à des seuils arbitraires.
-
----
+Les premiers jours peuvent produire des estimations instables (faibles dénominateurs, sous-détection, retards de notification). Une exclusion robuste est appliquée à partir de critères médiane + MAD afin de réduire l’influence des valeurs aberrantes initiales.
 
 ## Conclusion
 
-Ce travail constitue une première étape visant à estimer de manière cohérente les paramètres d’un modèle épidémiologique à partir de données observées.
-
-L’objectif n’est pas de produire une simulation fidèle de l’épidémie, mais de reconstruire des quantités latentes et d’obtenir des paramètres interprétables.
-
-Ces résultats pourront ensuite être utilisés dans des approches plus avancées, notamment des modèles d’apprentissage automatique destinés à reproduire ou prévoir les dynamiques observées.
+Le cadre SEIRD fournit une base interprétable pour reconstruire les états latents et suivre la dynamique temporelle des paramètres à partir de données observées. Cette base est ensuite prolongée par le modèle SEIRDV qui intègre explicitement la vaccination.
