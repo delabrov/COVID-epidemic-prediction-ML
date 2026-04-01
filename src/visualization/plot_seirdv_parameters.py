@@ -164,76 +164,121 @@ def plot_seirdv_vaccination_flow(df: pd.DataFrame, output_path: Path, country: s
     return _save_figure(fig, output_path)
 
 
-def plot_seirdv_beta(df: pd.DataFrame, output_path: Path, country: str) -> Path:
-    """Plot raw and smoothed beta estimates."""
+def _plot_parameter_series(
+    df: pd.DataFrame,
+    *,
+    output_path: Path,
+    country: str,
+    raw_column: str,
+    smoothed_column: str,
+    y_label: str,
+    title: str,
+    horizontal_ref: float | None = None,
+    horizontal_ref_label: str | None = None,
+    unstable_region_label: str = "Excluded unstable region",
+) -> Path | None:
+    """Plot a raw/smoothed parameter series with consistent style."""
+    if raw_column not in df.columns and smoothed_column not in df.columns:
+        LOGGER.warning(
+            "Skipping parameter plot (%s): missing columns %s and %s",
+            title,
+            raw_column,
+            smoothed_column,
+        )
+        return None
+
     fig, axis = plt.subplots(figsize=(12, 5))
-    if "beta_raw" in df.columns:
-        axis.plot(df.index, df["beta_raw"], alpha=0.35, linewidth=1.0, label="beta_raw")
-    if "beta_smoothed" in df.columns:
-        axis.plot(df.index, df["beta_smoothed"], linewidth=2.0, label="beta_smoothed")
-        valid_start = df["beta_smoothed"].first_valid_index()
+    if raw_column in df.columns:
+        axis.plot(df.index, df[raw_column], alpha=0.35, linewidth=1.0, label=raw_column)
+    if smoothed_column in df.columns:
+        axis.plot(df.index, df[smoothed_column], linewidth=2.0, label=smoothed_column)
+        valid_start = df[smoothed_column].first_valid_index()
         if isinstance(valid_start, pd.Timestamp) and valid_start > df.index.min():
             axis.axvspan(
                 df.index.min(),
                 valid_start,
                 alpha=0.3,
                 color="gray",
-                label="Excluded unstable region",
+                label=unstable_region_label,
             )
-    axis.axhline(0.0, linestyle="--", linewidth=1.0)
-    axis.set_title(f"Estimated SEIRDV beta(t) - {country}")
+
+    if horizontal_ref is not None:
+        axis.axhline(
+            horizontal_ref,
+            linestyle="--",
+            linewidth=1.0,
+            label=horizontal_ref_label,
+        )
+
+    axis.set_title(f"{title} - {country}")
     axis.set_xlabel("Date")
-    axis.set_ylabel("beta")
+    axis.set_ylabel(y_label)
     axis.grid(alpha=0.2)
     _safe_legend(axis)
     return _save_figure(fig, output_path)
+
+
+def plot_seirdv_beta(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+    """Plot raw and smoothed beta estimates using the same style as other parameter plots."""
+    return _plot_parameter_series(
+        df,
+        output_path=output_path,
+        country=country,
+        raw_column="beta_raw",
+        smoothed_column="beta_smoothed",
+        y_label="beta",
+        title="Estimated SEIRDV beta(t)",
+        horizontal_ref=0.0,
+        horizontal_ref_label=None,
+    )
 
 
 def plot_seirdv_mu(df: pd.DataFrame, output_path: Path, country: str) -> Path:
     """Plot raw and smoothed mu estimates with excluded unstable region."""
-    fig, axis = plt.subplots(figsize=(12, 5))
-    if "mu_raw" in df.columns:
-        axis.plot(df.index, df["mu_raw"], alpha=0.35, linewidth=1.0, label="mu_raw")
-    if "mu_smoothed" in df.columns:
-        axis.plot(df.index, df["mu_smoothed"], linewidth=2.0, label="mu_smoothed")
-
-        valid_start = df["mu_smoothed"].first_valid_index()
-        if isinstance(valid_start, pd.Timestamp) and valid_start > df.index.min():
-            axis.axvspan(
-                df.index.min(),
-                valid_start,
-                alpha=0.3,
-                color="gray",
-                label="Excluded unstable region",
-            )
-
-    axis.axhline(0.0, linestyle="--", linewidth=1.0)
-    axis.set_title(f"Estimated SEIRDV mu(t) - {country}")
-    axis.set_xlabel("Date")
-    axis.set_ylabel("mu")
-    axis.grid(alpha=0.2)
-    _safe_legend(axis)
-    return _save_figure(fig, output_path)
+    out = _plot_parameter_series(
+        df,
+        output_path=output_path,
+        country=country,
+        raw_column="mu_raw",
+        smoothed_column="mu_smoothed",
+        y_label="mu",
+        title="Estimated SEIRDV mu(t)",
+        horizontal_ref=0.0,
+        horizontal_ref_label=None,
+    )
+    if out is None:
+        raise ValueError("mu plot generation failed unexpectedly")
+    return out
 
 
 def plot_seirdv_reff_proxy(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
     """Plot raw and smoothed R_eff proxy when available."""
-    if "R_eff_proxy_raw" not in df.columns and "R_eff_proxy_smoothed" not in df.columns:
-        LOGGER.warning("Skipping SEIRDV R_eff proxy plot: required columns not found")
-        return None
+    return _plot_parameter_series(
+        df,
+        output_path=output_path,
+        country=country,
+        raw_column="R_eff_proxy_raw",
+        smoothed_column="R_eff_proxy_smoothed",
+        y_label="R_eff_proxy",
+        title="SEIRDV Effective Reproduction Proxy",
+        horizontal_ref=1.0,
+        horizontal_ref_label=None,
+    )
 
-    fig, axis = plt.subplots(figsize=(12, 5))
-    if "R_eff_proxy_raw" in df.columns:
-        axis.plot(df.index, df["R_eff_proxy_raw"], alpha=0.35, linewidth=1.0, label="R_eff_proxy_raw")
-    if "R_eff_proxy_smoothed" in df.columns:
-        axis.plot(df.index, df["R_eff_proxy_smoothed"], linewidth=2.0, label="R_eff_proxy_smoothed")
-    axis.axhline(1.0, linestyle="--", linewidth=1.0)
-    axis.set_title(f"SEIRDV Effective Reproduction Proxy - {country}")
-    axis.set_xlabel("Date")
-    axis.set_ylabel("R_eff_proxy")
-    axis.grid(alpha=0.2)
-    _safe_legend(axis)
-    return _save_figure(fig, output_path)
+
+def plot_seirdv_nu(df: pd.DataFrame, output_path: Path, country: str) -> Path | None:
+    """Plot raw and smoothed vaccination flow nu(t)."""
+    return _plot_parameter_series(
+        df,
+        output_path=output_path,
+        country=country,
+        raw_column="nu_flow_raw",
+        smoothed_column="nu_flow_smoothed",
+        y_label="nu (people/day)",
+        title="Estimated SEIRDV nu(t) vaccination flow",
+        horizontal_ref=0.0,
+        horizontal_ref_label=None,
+    )
 
 
 def plot_seirdv_summary(df: pd.DataFrame, output_path: Path, country: str) -> Path:
@@ -642,6 +687,7 @@ def generate_seirdv_parameter_plots(
     beta_path = output_dir / f"covid_{slug}_seirdv_beta_estimates.png"
     mu_path = output_dir / f"covid_{slug}_seirdv_mu_estimates.png"
     reff_path = output_dir / f"covid_{slug}_seirdv_reff_proxy.png"
+    nu_path = output_dir / f"covid_{slug}_seirdv_nu_flow.png"
     summary_path = output_dir / f"covid_{slug}_seirdv_parameter_summary.png"
     observed_vs_reconstructed_cases_path = output_dir / f"covid_{slug}_seirdv_observed_vs_reconstructed_cases.png"
     observed_vs_reconstructed_deaths_path = output_dir / f"covid_{slug}_seirdv_observed_vs_reconstructed_deaths.png"
@@ -659,6 +705,7 @@ def generate_seirdv_parameter_plots(
         "beta_plot_path": plot_seirdv_beta(dataset, beta_path, country),
         "mu_plot_path": plot_seirdv_mu(dataset, mu_path, country),
         "reff_proxy_plot_path": plot_seirdv_reff_proxy(dataset, reff_path, country),
+        "nu_plot_path": plot_seirdv_nu(dataset, nu_path, country),
         "summary_plot_path": plot_seirdv_summary(dataset, summary_path, country),
         "observed_vs_reconstructed_cases_plot_path": plot_seirdv_observed_vs_reconstructed_cases(
             dataset,
