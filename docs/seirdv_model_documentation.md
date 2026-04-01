@@ -78,26 +78,3 @@ Reff(t) ~= [beta(t) / (gamma + mu(t))] * [S_t + (1 - epsilon_v) * V_t] / N
 
 Les séries `beta` et `mu` sont ensuite lissées par moyenne glissante. Les périodes initiales instables sont gérées par une détection robuste fondée sur médiane + MAD.
 
-## 5. Résultats obtenus
-
-Le modèle produit un très bon ajustement sur les cas (`R2 ~= 0.98`) et un bon ajustement sur les décès (`R2 ~= 0.93`). Les erreurs (RMSE, MAE) restent compatibles avec une analyse de tendance.
-
-Les séries brutes de `beta(t)` et `mu(t)` sont volatiles, ce qui est attendu avec des dérivées et des ratios. Le lissage améliore fortement la lisibilité des régimes temporels. `Reff(t)` oscille autour du seuil 1, ce qui permet d’identifier les phases de croissance ou de décroissance.
-
-## 6. Discussion scientifique
-
-`beta(t)` est une transmissibilité effective agrégée : elle absorbe les effets comportementaux, les interventions, les caractéristiques des variants et des facteurs de contexte. `mu(t)` est un proxy dynamique de létalité conditionnelle aux infectieux reconstruits, pas une IFR démographique stricte.
-
-L’introduction de `V` et `epsilon_v` améliore l’interprétation des phases post-vaccinales en modélisant une susceptibilité effective réduite. En revanche, l’hypothèse `epsilon_v` constante reste forte sur des périodes longues.
-
-## 7. Comparaison qualitative avec la littérature
-
-Les ordres de grandeur observés sont cohérents avec les études compartimentales COVID : `beta` variable dans le temps, `Reff` évoluant autour de 1 selon les régimes, et `mu` plus élevé au début puis souvent décroissant avec l’amélioration de la prise en charge et l’immunisation.
-
-L’efficacité vaccinale contre l’infection est connue pour varier selon les variants, le temps depuis vaccination et les rappels. Une valeur constante est donc une approximation utile mais limitée.
-
-## 8. Perspectives
-
-Une extension naturelle consiste à introduire `epsilon_v(t)` dépendant du temps. D’autres axes : détection automatique de régimes (changepoints), stratification par âge, couplage spatial, et quantification d’incertitude (cadres bayésiens).
-
-Le modèle SEIRDV actuel constitue une base robuste, lisible et opérationnelle pour analyser la dynamique épidémique à partir de données agrégées nationales.
