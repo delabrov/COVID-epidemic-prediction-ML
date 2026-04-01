@@ -2,9 +2,9 @@
 
 ## 1. Périmètre et objectif
 
-Ce document synthétise les résultats obtenus avec le pipeline SEIRDV sur la France (fenêtre `2020-01-05` à `2023-07-01`, 1274 jours). L’objectif est de présenter les paramètres dynamiques estimés, d’expliquer leur méthode d’estimation, puis d’interpréter les variations observées d’un point de vue épidémiologique.
+Ce document synthétise les résultats obtenus avec le pipeline SEIRDV sur la France (fenêtre `2020-01-05` à `2023-07-01`, 1274 jours). L’objectif est de présenter les paramètres dynamiques estimés, d’expliquer la méthode d’estimation, puis d’interpréter les variations observées d’un point de vue épidémiologique.
 
-Les figures présentées ici sont volontairement limitées à `mu(t)`, `R_eff(t)` et `nu(t)`.
+Les figures principales présentées sont `beta(t)`, `mu(t)`, `R_eff(t)` et `nu(t)`.
 
 ## 2. Rappel de la méthode d’estimation
 
@@ -24,7 +24,7 @@ Configuration principale utilisée :
 - `latent_period_days = 5` donc `sigma = 0.2`
 - `infectious_period_days = 14` donc `gamma = 0.07142857`
 - `death_delay_days = 14`
-- `epsilon_v = 0.6` (efficacité vaccinale fixe)
+- `epsilon_v = 0.6` (efficacité vaccinale fixée)
 - dérivée numérique `gradient`
 - lissage par moyenne glissante (`window = 7`)
 - exclusion des zones instables par règle robuste médiane + MAD
@@ -68,45 +68,68 @@ Informations complémentaires utiles :
 - `beta_smoothed` : 2020 = 0.082, 2021 = 0.116, 2022 = 0.228, 2023 = 0.198
 - `mu_smoothed` : 2020 = 0.00134, 2021 = 0.000836, 2022 = 0.000117, 2023 = 0.000306
 - `R_eff_smoothed` : 2020 = 1.146, 2021 = 1.038, 2022 = 1.016, 2023 = 0.866
-- `nu_smoothed` (pers/jour) : 2020 ≈ 0, 2021 ≈ 135,490, 2022 ≈ 10,120, 2023 ≈ 244
+- `nu_smoothed` (pers/jour) : 2020 ~= 0, 2021 ~= 135,490, 2022 ~= 10,120, 2023 ~= 244
 
 Lecture épidémiologique : la mortalité conditionnelle `mu(t)` baisse fortement après 2020, la vaccination est maximale en 2021, et `R_eff` revient progressivement vers des niveaux plus contrôlés en 2023.
 
-## 5. Figures (mu, R_eff, nu)
+## 5. Figures principales
 
-## 5.1 `mu(t)`
+Note GitHub : pour éviter les problèmes d’affichage relatifs, les images sont référencées via URL brute (`raw.githubusercontent.com`) et un lien fichier est ajouté.
 
-![SEIRDV mu(t)](../outputs/figures/seirdv/covid_france_seirdv_mu_estimates.png)
+### 5.1 `beta(t)`
 
-Interprétation : les pics de `mu(t)` apparaissent surtout au début des vagues les plus sévères, puis la tendance centrale baisse avec l’amélioration de la prise en charge et l’immunisation. Une remontée ponctuelle peut survenir selon la structure d’âge des infectés et la pression hospitalière.
+![SEIRDV beta(t)](https://raw.githubusercontent.com/delabrov/COVID-epidemic-prediction-ML/main/outputs/figures/seirdv/covid_france_seirdv_beta_estimates.png)
 
-## 5.2 `R_eff(t)`
+Fichier : [outputs/figures/seirdv/covid_france_seirdv_beta_estimates.png](../outputs/figures/seirdv/covid_france_seirdv_beta_estimates.png)
 
-![SEIRDV R_eff(t)](../outputs/figures/seirdv/covid_france_seirdv_reff_proxy.png)
+Interprétation : la variabilité de `beta(t)` suit les changements de transmissibilité effective (comportements, variants, saisonnalité, mesures). Les pics correspondent à des phases de reprise épidémique.
 
-Interprétation : quand `R_eff > 1`, la dynamique est expansive; quand `R_eff < 1`, la dynamique est régressive. La série oscille autour de 1, ce qui est cohérent avec des successions de phases de reprise et de contrôle.
+### 5.2 `mu(t)`
 
-## 5.3 `nu(t)`
+![SEIRDV mu(t)](https://raw.githubusercontent.com/delabrov/COVID-epidemic-prediction-ML/main/outputs/figures/seirdv/covid_france_seirdv_mu_estimates.png)
 
-![SEIRDV nu(t)](../outputs/figures/seirdv/covid_france_seirdv_nu_flow.png)
+Fichier : [outputs/figures/seirdv/covid_france_seirdv_mu_estimates.png](../outputs/figures/seirdv/covid_france_seirdv_mu_estimates.png)
 
-Interprétation : `nu(t)` reflète la dynamique de campagne vaccinale. La montée rapide en 2021, puis la décroissance en 2022-2023, suit la logique d’une phase de montée en charge suivie d’un régime de rappels plus ciblé.
+Interprétation : les pics de `mu(t)` apparaissent surtout au début des vagues les plus sévères, puis la tendance centrale baisse avec l’amélioration de la prise en charge et l’immunisation.
 
-## 6. Comparaison à la littérature COVID-19
+### 5.3 `R_eff(t)`
 
-La cohérence globale est bonne pour un modèle agrégé national :
+![SEIRDV R_eff(t)](https://raw.githubusercontent.com/delabrov/COVID-epidemic-prediction-ML/main/outputs/figures/seirdv/covid_france_seirdv_reff_proxy.png)
 
-- `beta(t)` est du bon ordre de grandeur pour des modèles SEIR journaliers (valeurs de l’ordre de quelques dixièmes selon périodes, interventions et variants).
-- `R_eff(t)` reste centré autour de 1 sur longue période, avec excursions au-dessus et en dessous, ce qui correspond aux observations publiées sur les vagues successives.
-- `mu(t)` est un taux dynamique conditionnel aux infectieux reconstruits, pas une IFR stricte. Son niveau plus élevé en début de pandémie puis sa baisse est qualitativement cohérent avec la littérature.
-- L’efficacité vaccinale fixée (`epsilon_v = 0.6`) est plausible comme moyenne agrégée, mais simplifie fortement la réalité (dépendance au temps, aux variants et aux rappels).
+Fichier : [outputs/figures/seirdv/covid_france_seirdv_reff_proxy.png](../outputs/figures/seirdv/covid_france_seirdv_reff_proxy.png)
 
-Point important de lecture : transformer `mu` en proxy de fatalité de type `mu/(gamma+mu)` donne une médiane proche de `0.45%` et un P95 proche de `2.8%`. Ces niveaux restent plausibles pour des phases hétérogènes, mais doivent être interprétés avec prudence car ils dépendent de la reconstruction des états et des délais.
+Interprétation : quand `R_eff > 1`, la dynamique est expansive; quand `R_eff < 1`, la dynamique est régressive. La série oscille autour de 1, ce qui est cohérent avec des alternances de reprise et de contrôle.
 
-## 7. Note sur le graphe `beta(t)`
+### 5.4 `nu(t)`
 
-Le code de visualisation a été modifié pour construire `beta(t)` avec le même style que les autres paramètres (courbe brute, courbe lissée, zone instable exclue). La figure mise à jour est :
+![SEIRDV nu(t)](https://raw.githubusercontent.com/delabrov/COVID-epidemic-prediction-ML/main/outputs/figures/seirdv/covid_france_seirdv_nu_flow.png)
 
-- `outputs/figures/seirdv/covid_france_seirdv_beta_estimates.png`
+Fichier : [outputs/figures/seirdv/covid_france_seirdv_nu_flow.png](../outputs/figures/seirdv/covid_france_seirdv_nu_flow.png)
 
-Elle n’est pas affichée ici pour respecter la contrainte de ne présenter que `mu(t)`, `R_eff(t)` et `nu(t)`.
+Interprétation : `nu(t)` reflète la dynamique de campagne vaccinale. La montée rapide en 2021 puis la décroissance en 2022-2023 sont cohérentes avec une phase d’extension de couverture puis un régime de rappels.
+
+## 6. Comparaison avec la littérature scientifique
+
+Le tableau ci-dessous compare les ordres de grandeur du modèle aux valeurs généralement rapportées dans la littérature COVID-19.
+
+| Quantité | Estimation SEIRDV (ce projet) | Ordres de grandeur dans la littérature | Cohérence |
+|---|---|---|---|
+| `beta(t)` journalier | médiane `0.147`, P05-P95 `0.060-0.312` | souvent de l’ordre `0.1-0.4 / jour` dans des SEIR calibrés (fortement dépendant du modèle, de la période et de la définition des compartiments) | Oui, ordre de grandeur plausible |
+| `R_eff(t)` | médiane `0.988`, P95 `1.539`, max `2.194` | phases de contrôle proches de 1, avec dépassements >1 pendant les vagues ; `R0` initial souvent `~2-4` au début de la pandémie | Oui |
+| `mu(t)` (taux dynamique) | médiane `3.23e-4 / jour`, P95 `2.05e-3 / jour` | non directement comparable à l’IFR, mais la dynamique décroissante post-2020 est cohérente avec la baisse de sévérité observée | Oui (avec prudence) |
+| Proxy fatalité `mu/(gamma+mu)` | médiane `0.45%`, P95 `2.8%` | IFR globale initiale souvent estimée autour de `~0.5-1%`, très hétérogène selon âge, période et immunité | Globalement cohérent |
+| `epsilon_v` (fixé) | `0.6` | VE contre l’infection : élevée au début contre souches historiques, plus modérée/variable contre Omicron avec décroissance dans le temps | Plausible comme moyenne agrégée |
+
+Points de vigilance :
+
+- `beta` est structurellement dépendant du modèle et de la reconstruction des compartiments ; la comparaison inter-études doit rester qualitative.
+- `mu(t)` n’est pas une IFR démographique directe. C’est un paramètre effectif conditionné par les choix de reconstruction (`I_lagged`, fenêtre glissante, délai décès).
+- `epsilon_v` constant simplifie fortement la réalité (waning, rappels, variants).
+
+## 7. Références (littérature)
+
+1. Liu Y et al. *The reproductive number of COVID-19 is higher compared to SARS coronavirus* (J Travel Med, 2020). PubMed: https://pubmed.ncbi.nlm.nih.gov/32052846/
+2. Meyerowitz-Katz G, Merone L. *A systematic review and meta-analysis of published research data on COVID-19 infection fatality rates* (2020). PubMed: https://pubmed.ncbi.nlm.nih.gov/33007452/
+3. O'Driscoll M et al. *Age-specific mortality and immunity patterns of SARS-CoV-2* (Nature, 2021). PubMed: https://pubmed.ncbi.nlm.nih.gov/33137809/
+4. Lu L et al. *Effectiveness of COVID-19 Vaccines against SARS-CoV-2 Omicron Variant: A Systematic Review and Meta-Analysis* (Vaccines, 2023). PubMed: https://pubmed.ncbi.nlm.nih.gov/36560590/
+5. Hu J et al. *Real-World Effectiveness of COVID-19 Vaccines against Omicron* (Vaccines, 2023). PubMed: https://pubmed.ncbi.nlm.nih.gov/36851102/
